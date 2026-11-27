@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sealed-WEC 3D Co-Design Studio — Interactive Showcase</title>
+<style>
+  :root {
+    --bg: #080f1c;
+    --panel: #0f172a;
+    --panel2: #162137;
+    --border: #25344f;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent2: #2563eb;
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px; line-height: 1.38;
+  }
+  header {
+    height: 48px; padding: 0 16px; background: linear-gradient(90deg, #0b1324, #13284b);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(56,189,248,0.16); color: var(--accent); border: 1px solid rgba(56,189,248,0.35); }
+  .pill-ok { background: rgba(34,197,94,0.16); color: #86efac; border-color: rgba(34,197,94,0.4); }
+  .pill-bad { background: rgba(239,68,68,0.16); color: #fca5a5; border-color: rgba(239,68,68,0.4); }
+  .pill-warn { background: rgba(245,158,11,0.18); color: #fde68a; border-color: rgba(245,158,11,0.45); }
+  .workspace {
+    display: grid;
+    grid-template-columns: 310px 1fr 330px;
+    height: calc(100vh - 48px);
+    min-height: 640px;
+  }
+  @media (max-width: 1100px) {
+    .workspace { grid-template-columns: 1fr; height: auto; }
+    .viewport-wrap { min-height: 420px; }
+  }
+  .sidebar {
+    background: var(--panel); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .sidebar.right { border-right: none; border-left: 1px solid var(--border); }
+  .center-col { display: flex; flex-direction: column; min-width: 0; background: #050a14; }
+  .viewport-wrap { position: relative; flex: 1 1 auto; min-height: 390px; overflow: hidden; }
+  #glCanvas { width: 100%; height: 100%; display: block; cursor: grab; }
+  #glCanvas:active { cursor: grabbing; }
+  .hud-top {
+    position: absolute; top: 10px; left: 10px; right: 10px;
+    display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; gap: 8px; flex-wrap: wrap;
+  }
+  .hud-group { display: flex; gap: 6px; flex-wrap: wrap; pointer-events: auto; }
+  .hud-btn {
+    background: rgba(15,23,42,0.86); color: var(--text); border: 1px solid var(--border);
+    padding: 5px 10px; border-radius: 6px; font-size: 11.5px; cursor: pointer; backdrop-filter: blur(4px);
+  }
+  .hud-btn.active { background: var(--accent2); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .hud-specs {
+    position: absolute; bottom: 10px; left: 10px;
+    background: rgba(10,16,30,0.84); border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 11px; font-size: 11.5px; display: flex; gap: 14px; flex-wrap: wrap; pointer-events: none;
+  }
+  .hud-specs b { color: var(--accent); }
+  .bottom-dock {
+    background: var(--panel); border-top: 1px solid var(--border);
+    padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; max-height: 275px; overflow-y: auto;
+  }
+  .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .kpi-card {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px;
+  }
+  .kpi-card .lbl { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+  .kpi-card .val { font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .kpi-card .sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .sec { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+  .sec-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-bottom: 7px; letter-spacing: 0.4px; }
+  label.fld { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--muted); margin-bottom: 7px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  input, select {
+    background: #0b1322; color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 5px 7px; font-size: 12px; width: 100%;
+  }
+  input[type="range"] { padding: 0; accent-color: var(--accent); }
+  .btn {
+    border: none; border-radius: 6px; padding: 8px 11px; font-weight: 600; font-size: 12.5px; cursor: pointer; width: 100%;
+  }
+  .btn-primary { background: linear-gradient(90deg, #0284c7, #2563eb); color: #fff; }
+  .btn-secondary { background: #1e293b; color: var(--text); border: 1px solid var(--border); }
+  .btn-success { background: linear-gradient(90deg, #059669, #10b981); color: #fff; }
+  .btn:disabled { opacity: 0.55; cursor: wait; }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: #0b1322; padding: 3px; border-radius: 6px; border: 1px solid var(--border); }
+  .tab-btn { background: transparent; color: var(--muted); border: none; padding: 5px; border-radius: 4px; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+  .tab-btn.active { background: var(--accent2); color: #fff; }
+  #mapCanvas { width: 100%; height: 155px; background: #07101f; border: 1px solid var(--border); border-radius: 6px; cursor: crosshair; display: block; }
+  .chk-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; border-radius: 5px; background: #0b1322; margin-bottom: 4px; font-size: 11.5px; border-left: 3px solid var(--ok); }
+  .chk-row.fail { border-left-color: var(--bad); background: rgba(239,68,68,0.09); }
+  .chk-row.warn { border-left-color: var(--warn); background: rgba(245,158,11,0.09); }
+  .delta-pos { color: #4ade80; font-weight: 600; }
+  .delta-neg { color: #f87171; font-weight: 600; }
+  .analytics-split { display: grid; grid-template-columns: 1.25fr 1fr; gap: 10px; align-items: start; }
+  #pmCanvas { width: 100%; height: 120px; border: 1px solid var(--border); border-radius: 6px; background: #07101f; display: block; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--ok); margin-right: 4px; }
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(2, 6, 23, 0.78); display: none;
+    align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .modal-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    max-width: 500px; width: 100%; padding: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.65);
+  }
+  .modal-card h3 { margin: 0 0 8px; font-size: 16px; color: var(--accent); }
+  .modal-card p { margin: 0 0 10px; color: #cbd5e1; font-size: 12.5px; line-height: 1.48; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span>Sealed-WEC 3D Co-Design Studio</span>
+    <span class="pill pill-warn" id="hullCountBadge">Public Showcase | 12/150 Hulls | IP-Protected</span>
+    <span class="pill" id="modeBadge">AI Optimal Baseline</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);">
+    <span id="statusText"><span class="status-dot"></span>Ready</span>
+    <button class="hud-btn" id="btnConnectApi">Connect Private API</button>
+    <button class="hud-btn" id="btnExportZip" style="background:#065f46;border-color:#10b981;color:#fff;">Export .ZIP Pre-FEED</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sec">
+      <div class="sec-title">1. Site &amp; Wave Power Density Map</div>
+      <canvas id="mapCanvas" width="286" height="155" title="Click North American coast to select nearest showcase site"></canvas>
+      <div style="font-size:11px;color:var(--muted);margin:4px 0 6px;display:flex;justify-content:space-between;">
+        <span id="siteSummaryTxt">Port Hardy, BC (J=43.4 kW/m)</span>
+        <span style="color:#facc15;">10 Showcase Sites</span>
+      </div>
+      <label class="fld" id="siteModeWrap">Site Source
+        <select id="siteMode">
+          <option value="showcase">Curated 10-Site Showcase (Static Demo)</option>
+          <option value="hindcast" disabled>Full NA Hindcast Grid (Private API Only)</option>
+          <option value="custom" disabled>Custom Global Offshore Coordinates (Private API Only)</option>
+        </select>
+      </label>
+      <label class="fld" id="presetWrap">Showcase Coastal Site
+        <select id="sitePreset"></select>
+      </label>
+      <div class="row2">
+        <label class="fld">Lat [deg]<input id="inLat" type="number" step="0.05" value="50.80" readonly/></label>
+        <label class="fld">Lon [deg]<input id="inLon" type="number" step="0.05" value="-129.00" readonly/></label>
+      </div>
+      <div id="customMetoceanWrap" style="display:none;">
+        <div class="row2">
+          <label class="fld">Mean Hs [m]<input id="cHs" type="number" step="0.1" value="2.4"/></label>
+          <label class="fld">Mean Te [s]<input id="cTe" type="number" step="0.2" value="9.5"/></label>
+        </div>
+        <div class="row2">
+          <label class="fld">Depth [m]<input id="cDepth" type="number" step="5" value="90"/></label>
+          <label class="fld">50-Yr Hs50 [m]<input id="cHs50" type="number" step="0.5" value="10.2"/></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">2. Project &amp; Deployment Constraints</div>
+      <label class="fld">Commercial Application
+        <select id="inUseCase"></select>
+      </label>
+      <div class="row2">
+        <label class="fld">Target kW / Unit<input id="inTargetKw" type="number" min="5" max="1000" step="5" value="60"/></label>
+        <label class="fld">Array Units<input id="inUnits" type="number" min="1" max="100" value="2"/></label>
+      </div>
+      <div class="row2">
+        <label class="fld">Diesel [$/L]<input id="inDiesel" type="number" step="0.1" value="2.15"/></label>
+        <label class="fld">Off-Grid Umbilical
+          <select id="inOffgrid"><option value="1">Yes (Local Load)</option><option value="0">No (Shore Export)</option></select>
+        </label>
+      </div>
+      <label class="fld">Hull Fabrication Filter
+        <select id="inFabFilter">
+          <option value="all">Showcase Hulls (12 Representative Shapes)</option>
+          <option value="commercial_archetypes">Commercial PA Archetypes &amp; Baselines</option>
+          <option value="flat_panel_weldable">Flat-Plate Weldable (Polygon/Facet)</option>
+          <option value="axisymmetric_rolled">Axisymmetric Rolled Cylinders</option>
+          <option value="chamfered_or_filleted">Chamfered / Filleted Drag-Reduced</option>
+          <option value="surface_piercing">Surface-Piercing Buoys Only</option>
+          <option value="submerged_stealth">Submerged Stealth Buoys (CalWave/CETO)</option>
+        </select>
+      </label>
+      <div class="row2">
+        <label class="fld">Max Draft [m] (opt)<input id="inMaxDraft" type="number" min="2" max="40" step="0.5" placeholder="No cap"/></label>
+        <label class="fld">Max Anchor R [m]<input id="inMaxAncR" type="number" min="35" max="600" step="10" placeholder="No cap"/></label>
+      </div>
+      <button class="btn btn-primary" id="btnRecommend">Auto-Recommend Optimal WEC</button>
+    </div>
+
+    <div class="sec" style="font-size:11px;color:var(--muted);">
+      <div class="sec-title">IP Protection Notice</div>
+      This public WebGL demo renders coarse unit meshes and pre-computed metrics for <b>12 of 150 hulls</b> across <b>10 curated sites</b>. 138 proprietary geometries, physics solvers, ML weights, and CAD/Mooring exports remain private.
+    </div>
+  </aside>
+
+  <!-- CENTER: 3D WebGL Ocean + Cutaway WEC + Bottom Analytics Dock -->
+  <main class="center-col">
+    <div class="viewport-wrap">
+      <canvas id="glCanvas"></canvas>
+      <div class="hud-top">
+        <div class="hud-group">
+          <button class="hud-btn active" id="btnViewHull">Hull &amp; Cutaway PTO</button>
+          <button class="hud-btn" id="btnViewMoor">Full Mooring &amp; Seabed</button>
+          <button class="hud-btn active" id="btnCutaway">X-Ray Cutaway: ON</button>
+          <button class="hud-btn active" id="btnWaveAnim">Wave Animation: ON</button>
+        </div>
+        <div class="hud-group" id="guardrailHeaderPills"></div>
+      </div>
+      <div class="hud-specs" id="hudSpecs">
+        <span>Drag: Orbit | Right-Drag/Shift: Pan | Scroll: Zoom</span>
+      </div>
+    </div>
+
+    <div class="bottom-dock">
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="lbl">Active Design</div><div class="val" id="kpiDesign">—</div><div class="sub" id="kpiDesignSub">—</div></div>
+        <div class="kpi-card"><div class="lbl">Array AEP (P50)</div><div class="val" id="kpiAep">—</div><div class="sub" id="kpiAepDelta">—</div></div>
+        <div class="kpi-card"><div class="lbl">LCOE vs Incumbent</div><div class="val" id="kpiLcoe">—</div><div class="sub" id="kpiLcoeDelta">—</div></div>
+        <div class="kpi-card"><div class="lbl">CAPEX &amp; 20-Yr NPV</div><div class="val" id="kpiNpv">—</div><div class="sub" id="kpiNpvDelta">—</div></div>
+        <div class="kpi-card"><div class="lbl">50-Yr Storm ULS</div><div class="val" id="kpiUls">—</div><div class="sub" id="kpiUlsSub">—</div></div>
+        <div class="kpi-card"><div class="lbl">NL Ratio &amp; Mathieu</div><div class="val" id="kpiNl">—</div><div class="sub" id="kpiNlSub">—</div></div>
+      </div>
+      <div class="analytics-split">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">ENGINEERING GUARDRAILS &amp; PHYSICAL VALIDATION CHECKS</div>
+          <div id="guardrailsList"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px;">IEC 20x16 ELECTRICAL POWER MATRIX (kW)</div>
+          <canvas id="pmCanvas" width="380" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT SIDEBAR -->
+  <aside class="sidebar right">
+    <div class="sec">
+      <div class="sec-title">3. Customize Hull, PTO &amp; Mooring</div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="tabHull" id="tabHullBtn">Hull (12 Demo)</button>
+        <button class="tab-btn" data-tab="tabPto">Sealed PTO</button>
+        <button class="tab-btn" data-tab="tabMoor">Mooring</button>
+      </div>
+
+      <div id="tabHull" class="tab-pane" style="margin-top:9px;">
+        <label class="fld">Hull Family Filter
+          <select id="custFamFilter"><option value="all">All Showcase Families</option></select>
+        </label>
+        <label class="fld">Selected 3D Hull Geometry
+          <select id="custHull"></select>
+        </label>
+        <div id="custHullDesc" style="font-size:11px;color:var(--muted);margin-bottom:8px;">—</div>
+        <label class="fld">Circumdiameter D_circ: <b id="lblDcirc" style="color:var(--text);">10.0 m</b>
+          <input id="custDcirc" type="range" min="3.0" max="20.0" step="0.2" value="10.0"/>
+        </label>
+        <label class="fld">Exact Diameter Input [m]
+          <input id="custDcircNum" type="number" min="3.0" max="24.0" step="0.2" value="10.0"/>
+        </label>
+      </div>
+
+      <div id="tabPto" class="tab-pane" style="display:none;margin-top:9px;">
+        <label class="fld">Internal Sealed PTO Architecture
+          <select id="custArch">
+            <option value="arch_a_heave">Arch A: Internal Translating Heave Mass</option>
+            <option value="arch_b_pendulum">Arch B: Inclined Compound Pendulum</option>
+            <option value="arch_c_gyro">Arch C: Vacuum Flywheel Gyroscope</option>
+          </select>
+        </label>
+        <label class="fld">Internal Reaction Mass Ratio (m2/avail): <b id="lblM2" style="color:var(--text);">0.56</b>
+          <input id="custM2" type="range" min="0.20" max="0.76" step="0.02" value="0.56"/>
+        </label>
+        <div class="row2">
+          <label class="fld">Generator kW<input id="custRatedKw" type="number" min="5" max="1500" step="5" value="60"/></label>
+          <label class="fld">Tuned Period [s]<input id="custTpTune" type="number" min="3.5" max="18.0" step="0.2" value="10.5"/></label>
+        </div>
+        <div id="pendulumOpts" style="display:none;">
+          <label class="fld">Shaft Inclination alpha [deg]
+            <input id="custAlpha" type="number" min="10" max="75" step="5" value="35"/>
+          </label>
+        </div>
+        <div id="gyroOpts" style="display:none;">
+          <div class="row2">
+            <label class="fld">Flywheel Material
+              <select id="custFwMat"><option value="steel">Marine Steel</option><option value="carbon">Carbon Composite</option></select>
+            </label>
+            <label class="fld">Spin RPM<input id="custFwRpm" type="number" min="150" max="2500" step="50" value="450"/></label>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabMoor" class="tab-pane" style="display:none;margin-top:9px;">
+        <label class="fld">Mooring Topology
+          <select id="custMoorCfg">
+            <option value="auto">Auto (Lowest Cost ULS Passing)</option>
+            <option value="catenary_chain">Catenary R4 Steel Chain</option>
+            <option value="semi_taut_hybrid">Semi-Taut Polyester</option>
+            <option value="taut_synthetic">Taut Synthetic Polyester</option>
+            <option value="taut_buoyant">Taut Buoyant (Submerged Only)</option>
+          </select>
+        </label>
+        <div class="row2">
+          <label class="fld">Lines Count
+            <select id="custNlines"><option value="">Auto (3 or 4)</option><option value="3">3 Lines</option><option value="4">4 Lines</option><option value="6">6 Lines</option></select>
+          </label>
+          <label class="fld">Line Grade
+            <select id="custLine"><option value="auto">Auto-Sized</option></select>
+          </label>
+        </div>
+        <label class="fld">Seabed Anchor Class
+          <select id="custAnchor">
+            <option value="auto">Auto (Match Topology)</option>
+            <option value="drag_embedment">Drag-Embedment (Sand/Clay)</option>
+            <option value="suction_pile">Suction Caisson Pile (Uplift-OK)</option>
+            <option value="drilled_pile">Drilled Monopile (Rock Seabed)</option>
+            <option value="gravity_deadweight">Concrete Gravity Deadweight</option>
+          </select>
+        </label>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+        <button class="btn btn-success" id="btnApplyCustom">Apply Customization &amp; Re-Simulate</button>
+        <button class="btn btn-secondary" id="btnResetBaseline">Reset to AI Site-Optimal</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">4. Baseline vs. Custom Deltas</div>
+      <div id="deltaSummaryBox" style="font-size:11.5px;color:var(--muted);">
+        Currently showing the AI site-optimal baseline. Adjust any parameter above to compare deltas live.
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- ENTERPRISE / IP MODAL -->
+<div class="modal-bg" id="ipModal">
+  <div class="modal-card">
+    <h3>Enterprise Pre-FEED &amp; Protected IP Access</h3>
+    <p>To safeguard proprietary intellectual property, the public GitHub Pages showcase includes only pre-computed visual summaries for <b>12 representative geometries</b> across <b>10 reference coastal sites</b>.</p>
+    <p>Full access to the <b>150-hull hydrodynamic library</b>, custom global coordinates, machine-learning surrogate inference, and downloadable <b>Pre-FEED packages</b> (full engineering dossier, watertight 3D CAD mesh, and dynamic mooring line definitions) requires private backend authorization.</p>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <a href="https://github.com/yman95" target="_blank" rel="noopener" class="btn btn-primary" style="text-align:center;text-decoration:none;">Request Pre-FEED Access (@yman95)</a>
+      <button class="btn btn-secondary" id="btnSwitchToApiFromIp">Connect Private API</button>
+      <button class="btn btn-secondary" id="btnCloseIpModal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRIVATE API MODAL -->
+<div class="modal-bg" id="apiModal">
+  <div class="modal-card">
+    <h3>Connect Private WEC Engine API</h3>
+    <p>Enter an authorized private backend endpoint and Bearer token to unlock live 150-hull evaluation, arbitrary site queries, and full `.ZIP` Pre-FEED export.</p>
+    <label class="fld">Private API Base URL<input id="apiUrlIn" type="url" placeholder="https://api.example.com"/></label>
+    <label class="fld">Bearer Token (optional if local)<input id="apiTokenIn" type="password" placeholder="Secret Bearer token"/></label>
+    <div id="apiConnMsg" style="font-size:11.5px;color:var(--warn);margin-bottom:8px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-success" id="btnSaveApi">Verify &amp; Connect</button>
+      <button class="btn btn-secondary" id="btnDisconnectApi">Use Static Showcase</button>
+      <button class="btn btn-secondary" id="btnCloseApiModal">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="demo_bundle.js"></script>
+<script>
+(() => {
+  const BUNDLE = window.SEALED_WEC_DEMO_BUNDLE || null;
+  let apiConfig = { enabled: false, baseUrl: "", token: "" };
+  let catalog = null;
+  let sitePoints = [];
+  let activeSite = null;
+  let baselineAssessment = null;
+  let activeAssessment = null;
+  let scene3d = null;
+
+  let viewMode = "hull";
+  let cutawayOn = true;
+  let waveAnimOn = true;
+  const cam = { yaw: 0.72, pitch: 0.34, dist: 24.0, tgt: [0, 0, 0], targetDist: 24.0, targetTgt: [0, 0, 0] };
+  let dragMode = null, lastMx = 0, lastMy = 0;
+
+  let gl = null, prog = null, loc = {};
+  let gpuBuffers = { opaqueHull: null, glassHull: null, ballast: null, mooring: [], anchors: [], watchCircle: null };
+  const $ = id => document.getElementById(id);
+
+  function setStatus(txt, busy=false) {
+    $("statusText").innerHTML = `<span class="status-dot" style="background:${busy ? '#facc15' : '#22c55e'}"></span>${txt}`;
+    $("btnRecommend").disabled = busy;
+    $("btnApplyCustom").disabled = busy;
+  }
+
+  async function apiFetch(path, opts={}) {
+    const headers = Object.assign({}, opts.headers || {});
+    if (apiConfig.token) headers["Authorization"] = `Bearer ${apiConfig.token}`;
+    return fetch(`${apiConfig.baseUrl}${path}`, Object.assign({}, opts, { headers }));
+  }
+
+  // ---------- Pure JS 4x4 Matrix Math & WebGL1 ----------
+  const toGL = (p) => [p[0], p[2], -p[1]];
+  function mat4Identity() { const m = new Float32Array(16); m[0]=m[5]=m[10]=m[15]=1; return m; }
+  function mat4Mul(a, b) {
+    const out = new Float32Array(16);
+    for (let c=0; c<4; c++) for (let r=0; r<4; r++)
+      out[c*4+r] = a[0*4+r]*b[c*4+0] + a[1*4+r]*b[c*4+1] + a[2*4+r]*b[c*4+2] + a[3*4+r]*b[c*4+3];
+    return out;
+  }
+  function mat4Perspective(fovRad, aspect, near, far) {
+    const f = 1.0 / Math.tan(fovRad / 2), nf = 1 / (near - far);
+    const m = new Float32Array(16);
+    m[0]=f/aspect; m[5]=f; m[10]=(far+near)*nf; m[11]=-1; m[14]=(2*far*near)*nf;
+    return m;
+  }
+  function mat4LookAt(eye, tgt, up) {
+    let zx=eye[0]-tgt[0], zy=eye[1]-tgt[1], zz=eye[2]-tgt[2];
+    let len = Math.hypot(zx, zy, zz) || 1; zx/=len; zy/=len; zz/=len;
+    let xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx;
+    len = Math.hypot(xx, xy, xz) || 1; xx/=len; xy/=len; xz/=len;
+    let yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    const m = new Float32Array(16);
+    m[0]=xx; m[1]=yx; m[2]=zx; m[4]=xy; m[5]=yy; m[6]=zy; m[8]=xz; m[9]=yz; m[10]=zz; m[15]=1;
+    m[12]=-(xx*eye[0]+xy*eye[1]+xz*eye[2]);
+    m[13]=-(yx*eye[0]+yy*eye[1]+yz*eye[2]);
+    m[14]=-(zx*eye[0]+zy*eye[1]+zz*eye[2]);
+    return m;
+  }
+  function mat4Translate(x,y,z) { const m=mat4Identity(); m[12]=x; m[13]=y; m[14]=z; return m; }
+  function mat4RotateX(a) { const m=mat4Identity(), c=Math.cos(a), s=Math.sin(a); m[5]=c; m[6]=s; m[9]=-s; m[10]=c; return m; }
+  function mat4RotateY(a) { const m=mat4Identity(), c=Math.cos(a), s=Math.sin(a); m[0]=c; m[2]=-s; m[8]=s; m[10]=c; return m; }
+  function mat4RotateZ(a) { const m=mat4Identity(), c=Math.cos(a), s=Math.sin(a); m[0]=c; m[1]=s; m[4]=-s; m[5]=c; return m; }
+
+  function createMeshObj(posArr, normArr, colArr) {
+    const pos=new Float32Array(posArr), norm=new Float32Array(normArr), col=new Float32Array(colArr);
+    const bPos=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bPos); gl.bufferData(gl.ARRAY_BUFFER, pos, gl.STATIC_DRAW);
+    const bNorm=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bNorm); gl.bufferData(gl.ARRAY_BUFFER, norm, gl.STATIC_DRAW);
+    const bCol=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bCol); gl.bufferData(gl.ARRAY_BUFFER, col, gl.STATIC_DRAW);
+    return { bPos, bNorm, bCol, count: pos.length/3 };
+  }
+  function pushTri(pos, norm, col, p0, p1, p2, c0, c1, c2) {
+    const ux=p1[0]-p0[0], uy=p1[1]-p0[1], uz=p1[2]-p0[2];
+    const vx=p2[0]-p0[0], vy=p2[1]-p0[1], vz=p2[2]-p0[2];
+    let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    const nl = Math.hypot(nx, ny, nz) || 1; nx/=nl; ny/=nl; nz/=nl;
+    pos.push(p0[0],p0[1],p0[2], p1[0],p1[1],p1[2], p2[0],p2[1],p2[2]);
+    norm.push(nx,ny,nz, nx,ny,nz, nx,ny,nz);
+    const cc1=c1||c0, cc2=c2||c0;
+    col.push(c0[0],c0[1],c0[2], cc1[0],cc1[1],cc1[2], cc2[0],cc2[1],cc2[2]);
+  }
+  function buildCylinderMesh(r, h, nSeg, rgb) {
+    const pos=[], norm=[], col=[], hh=h*0.5;
+    for (let i=0; i<nSeg; i++) {
+      const a0=2*Math.PI*i/nSeg, a1=2*Math.PI*(i+1)/nSeg;
+      const x0=r*Math.cos(a0), z0=r*Math.sin(a0), x1=r*Math.cos(a1), z1=r*Math.sin(a1);
+      const b0=[x0,-hh,z0], b1=[x1,-hh,z1], t0=[x0,hh,z0], t1=[x1,hh,z1];
+      pushTri(pos,norm,col, b0,b1,t1, rgb); pushTri(pos,norm,col, b0,t1,t0, rgb);
+      pushTri(pos,norm,col, [0,hh,0],t0,t1, rgb); pushTri(pos,norm,col, [0,-hh,0],b1,b0, rgb);
+    }
+    return createMeshObj(pos, norm, col);
+  }
+  function buildSphereMesh(r, nLat, nLon, rgb) {
+    const pos=[], norm=[], col=[];
+    for (let i=0; i<nLat; i++) {
+      const p0=Math.PI*i/nLat, p1=Math.PI*(i+1)/nLat;
+      for (let j=0; j<nLon; j++) {
+        const t0=2*Math.PI*j/nLon, t1=2*Math.PI*(j+1)/nLon;
+        const pt=(p,t)=>[r*Math.sin(p)*Math.cos(t), r*Math.cos(p), r*Math.sin(p)*Math.sin(t)];
+        const a=pt(p0,t0), b=pt(p1,t0), c=pt(p1,t1), d=pt(p0,t1);
+        pushTri(pos,norm,col, a,b,c, rgb); pushTri(pos,norm,col, a,c,d, rgb);
+      }
+    }
+    return createMeshObj(pos, norm, col);
+  }
+  function buildTubeAlongPath(ptsGL, r, nSeg, rgb) {
+    const pos=[], norm=[], col=[];
+    for (let k=0; k<ptsGL.length-1; k++) {
+      const a=ptsGL[k], b=ptsGL[k+1];
+      let dx=b[0]-a[0], dy=b[1]-a[1], dz=b[2]-a[2];
+      const dl=Math.hypot(dx,dy,dz)||1; dx/=dl; dy/=dl; dz/=dl;
+      const ref = Math.abs(dy)<0.9 ? [0,1,0] : [1,0,0];
+      let ux=dy*ref[2]-dz*ref[1], uy=dz*ref[0]-dx*ref[2], uz=dx*ref[1]-dy*ref[0];
+      let ul=Math.hypot(ux,uy,uz)||1; ux/=ul; uy/=ul; uz/=ul;
+      const vx=dy*uz-dz*uy, vy=dz*ux-dx*uz, vz=dx*uy-dy*ux;
+      for (let i=0; i<nSeg; i++) {
+        const th0=2*Math.PI*i/nSeg, th1=2*Math.PI*(i+1)/nSeg;
+        const ox0=r*(Math.cos(th0)*ux+Math.sin(th0)*vx), oy0=r*(Math.cos(th0)*uy+Math.sin(th0)*vy), oz0=r*(Math.cos(th0)*uz+Math.sin(th0)*vz);
+        const ox1=r*(Math.cos(th1)*ux+Math.sin(th1)*vx), oy1=r*(Math.cos(th1)*uy+Math.sin(th1)*vy), oz1=r*(Math.cos(th1)*uz+Math.sin(th1)*vz);
+        pushTri(pos,norm,col, [a[0]+ox0,a[1]+oy0,a[2]+oz0], [b[0]+ox0,b[1]+oy0,b[2]+oz0], [b[0]+ox1,b[1]+oy1,b[2]+oz1], rgb);
+        pushTri(pos,norm,col, [a[0]+ox0,a[1]+oy0,a[2]+oz0], [b[0]+ox1,b[1]+oy1,b[2]+oz1], [a[0]+ox1,a[1]+oy1,a[2]+oz1], rgb);
+      }
+    }
+    return createMeshObj(pos, norm, col);
+  }
+
+  function initWebGL() {
+    const canvas = $("glCanvas");
+    gl = canvas.getContext("webgl", { antialias: true, alpha: false });
+    if (!gl) return;
+    const vsSrc = `
+      attribute vec3 aPos; attribute vec3 aNorm; attribute vec3 aColor;
+      uniform mat4 uMVP; uniform mat4 uModel;
+      varying vec3 vNorm; varying vec3 vColor;
+      void main() { gl_Position = uMVP * vec4(aPos, 1.0); vNorm = normalize(mat3(uModel) * aNorm); vColor = aColor; }`;
+    const fsSrc = `
+      precision mediump float;
+      varying vec3 vNorm; varying vec3 vColor;
+      uniform vec3 uLightDir; uniform float uAlpha;
+      void main() {
+        vec3 n = normalize(vNorm);
+        float d1 = max(dot(n, uLightDir), 0.0);
+        float d2 = abs(dot(n, normalize(vec3(-0.5, 0.4, -0.7)))) * 0.25;
+        gl_FragColor = vec4(vColor * (0.42 + 0.55 * d1 + d2), uAlpha);
+      }`;
+    const compile = (type, src) => {
+      const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); return sh;
+    };
+    prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSrc));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSrc));
+    gl.linkProgram(prog); gl.useProgram(prog);
+    loc = {
+      aPos: gl.getAttribLocation(prog, "aPos"), aNorm: gl.getAttribLocation(prog, "aNorm"), aColor: gl.getAttribLocation(prog, "aColor"),
+      uMVP: gl.getUniformLocation(prog, "uMVP"), uModel: gl.getUniformLocation(prog, "uModel"),
+      uLightDir: gl.getUniformLocation(prog, "uLightDir"), uAlpha: gl.getUniformLocation(prog, "uAlpha"),
+    };
+    gl.enableVertexAttribArray(loc.aPos); gl.enableVertexAttribArray(loc.aNorm); gl.enableVertexAttribArray(loc.aColor);
+  }
+
+  function rebuildSceneBuffers() {
+    if (!gl || !scene3d) return;
+    const hm = scene3d.hull_mesh;
+    const verts = hm.vertices, faces = hm.faces, mask = hm.cutaway_mask;
+    const opPos=[], opNorm=[], opCol=[], glPos=[], glNorm=[], glCol=[];
+    const cAbove=[0.80,0.84,0.89], cBelow=[0.04,0.52,0.78], cGlass=[0.22,0.74,0.97];
+    for (let f=0; f<faces.length; f++) {
+      const [i0,i1,i2] = faces[f];
+      const v0=verts[i0], v1=verts[i1], v2=verts[i2];
+      const p0=toGL(v0), p1=toGL(v1), p2=toGL(v2);
+      const colFn = v => v[2] >= -0.02 ? cAbove : cBelow;
+      if (cutawayOn && mask[f]) pushTri(glPos, glNorm, glCol, p0, p1, p2, cGlass);
+      else pushTri(opPos, opNorm, opCol, p0, p1, p2, colFn(v0), colFn(v1), colFn(v2));
+    }
+    gpuBuffers.opaqueHull = createMeshObj(opPos, opNorm, opCol);
+    gpuBuffers.glassHull = glPos.length ? createMeshObj(glPos, glNorm, glCol) : null;
+
+    const pto = scene3d.internal_pto_3d, bd = pto.ballast_disc;
+    gpuBuffers.ballast = buildCylinderMesh(bd.radius, bd.height, 24, [0.35, 0.42, 0.52]);
+    gpuBuffers.cgMesh = buildSphereMesh(Math.max(0.18, 0.045 * hm.r_wl), 8, 12, [0.98, 0.57, 0.24]);
+    gpuBuffers.cbMesh = buildSphereMesh(Math.max(0.18, 0.045 * hm.r_wl), 8, 12, [0.22, 0.74, 0.97]);
+    if (pto.architecture === "arch_a_heave") {
+      gpuBuffers.ptoMain = buildCylinderMesh(pto.mass_radius, pto.mass_height, 24, [0.94, 0.27, 0.27]);
+      const rH = Math.max(0.4, pto.rail_z_max - pto.rail_z_min);
+      gpuBuffers.ptoRail = buildCylinderMesh(Math.max(0.06, 0.028 * hm.r_wl), rH, 10, [0.98, 0.80, 0.08]);
+    } else if (pto.architecture === "arch_b_pendulum") {
+      gpuBuffers.ptoBob = buildSphereMesh(pto.bob_radius, 12, 16, [0.13, 0.77, 0.37]);
+      gpuBuffers.ptoArm = buildCylinderMesh(Math.max(0.06, 0.03 * hm.r_wl), pto.arm_length_m, 10, [0.98, 0.80, 0.08]);
+    } else {
+      gpuBuffers.ptoFw = buildCylinderMesh(pto.flywheel_radius, pto.flywheel_thickness, 28, [0.66, 0.33, 0.97]);
+      gpuBuffers.ptoGimbal = buildCylinderMesh(pto.gimbal_radius, Math.max(0.10, 0.05 * pto.gimbal_radius), 28, [0.98, 0.80, 0.08]);
+    }
+
+    const m = scene3d.mooring_3d;
+    const isChain = m.line_spec.toLowerCase().includes("chain");
+    const lineCol = isChain ? [0.96, 0.62, 0.04] : [0.20, 0.83, 0.60];
+    const tubeR = Math.max(0.08, Math.min(0.45, 0.012 * m.depth_m));
+    gpuBuffers.mooring = m.lines.map(ln => buildTubeAlongPath(ln.points.map(toGL), tubeR, 7, lineCol));
+    gpuBuffers.anchors = m.lines.map(() => buildCylinderMesh(Math.max(0.9, 0.04 * hm.r_wl * 3), Math.max(0.8, 0.025 * m.depth_m), 8, [0.94, 0.27, 0.27]));
+
+    const sbPos=[], sbNorm=[], sbCol=[], sbR=Math.max(60, 1.35 * m.anchor_radius_m), sbZ=-m.depth_m, cSand=[0.11, 0.16, 0.24];
+    pushTri(sbPos,sbNorm,sbCol, [-sbR,sbZ,-sbR], [-sbR,sbZ,sbR], [sbR,sbZ,sbR], cSand);
+    pushTri(sbPos,sbNorm,sbCol, [-sbR,sbZ,-sbR], [sbR,sbZ,sbR], [sbR,sbZ,-sbR], cSand);
+    gpuBuffers.seabed = createMeshObj(sbPos, sbNorm, sbCol);
+
+    const wcPts = [];
+    for (let i=0; i<=48; i++) { const a=2*Math.PI*i/48; wcPts.push([m.anchor_radius_m*Math.cos(a), -m.depth_m+0.18, -m.anchor_radius_m*Math.sin(a)]); }
+    gpuBuffers.watchCircle = buildTubeAlongPath(wcPts, Math.max(0.15, 0.004 * m.anchor_radius_m), 5, [0.39, 0.45, 0.55]);
+  }
+
+  function updateCameraTargetForView(snap=false) {
+    if (!scene3d) return;
+    const hm = scene3d.hull_mesh, m = scene3d.mooring_3d;
+    if (viewMode === "hull") {
+      cam.targetDist = Math.max(14.0, 2.75 * hm.r_wl * 2.0);
+      cam.targetTgt = [0, 0.35 * (hm.z_top + hm.z_keel), 0];
+    } else {
+      cam.targetDist = Math.max(45.0, 1.85 * Math.max(m.depth_m, m.anchor_radius_m));
+      cam.targetTgt = [0, -0.38 * m.depth_m, 0];
+    }
+    if (snap) { cam.dist = cam.targetDist; cam.tgt = [...cam.targetTgt]; }
+  }
+
+  function drawMesh(mesh, modelMat, vpMat, alpha=1.0) {
+    if (!mesh || mesh.count === 0) return;
+    gl.uniformMatrix4fv(loc.uMVP, false, mat4Mul(vpMat, modelMat));
+    gl.uniformMatrix4fv(loc.uModel, false, modelMat);
+    gl.uniform1f(loc.uAlpha, alpha);
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.bPos); gl.vertexAttribPointer(loc.aPos, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.bNorm); gl.vertexAttribPointer(loc.aNorm, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.bCol); gl.vertexAttribPointer(loc.aColor, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+  }
+
+  let dynamicWaveBuf = null;
+  function drawWaveGrid(tSec, vpMat) {
+    if (!scene3d) return;
+    const wm=scene3d.wave_motion, hm=scene3d.hull_mesh, m=scene3d.mooring_3d;
+    const ext = viewMode==="hull" ? Math.max(22, 3.0*hm.r_wl) : Math.max(60, 1.3*m.anchor_radius_m);
+    const N=22, amp=0.5*wm.hs_m, lamW=Math.max(14, 1.56*wm.tp_s*wm.tp_s), kw=2*Math.PI/lamW, om=2*Math.PI/wm.tp_s;
+    const pos=[], norm=[], col=[], cW=[0.06, 0.58, 0.88], phaseT=waveAnimOn?tSec:0.0;
+    const hFn = x => amp * Math.cos(kw * x - om * phaseT);
+    for (let i=0; i<N; i++) {
+      const x0=-ext+(2*ext*i)/N, x1=-ext+(2*ext*(i+1))/N, y0=hFn(x0), y1=hFn(x1);
+      for (let j=0; j<N; j++) {
+        const z0=-ext+(2*ext*j)/N, z1=-ext+(2*ext*(j+1))/N;
+        pushTri(pos,norm,col, [x0,y0,z0],[x0,y0,z1],[x1,y1,z1], cW);
+        pushTri(pos,norm,col, [x0,y0,z0],[x1,y1,z1],[x1,y1,z0], cW);
+      }
+    }
+    if (!dynamicWaveBuf) dynamicWaveBuf = { bPos: gl.createBuffer(), bNorm: gl.createBuffer(), bCol: gl.createBuffer() };
+    gl.bindBuffer(gl.ARRAY_BUFFER, dynamicWaveBuf.bPos); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, dynamicWaveBuf.bNorm); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(norm), gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, dynamicWaveBuf.bCol); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(col), gl.DYNAMIC_DRAW);
+    dynamicWaveBuf.count = pos.length / 3;
+    drawMesh(dynamicWaveBuf, mat4Identity(), vpMat, 0.28);
+  }
+
+  function renderFrame(nowMs) {
+    requestAnimationFrame(renderFrame);
+    if (!gl) return;
+    const canvas = $("glCanvas"), dpr = window.devicePixelRatio || 1;
+    const w = Math.max(100, Math.floor(canvas.clientWidth*dpr)), h = Math.max(100, Math.floor(canvas.clientHeight*dpr));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    gl.viewport(0,0,w,h); gl.clearColor(0.025,0.055,0.11,1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.depthMask(true);
+    if (!scene3d || !gpuBuffers.opaqueHull) return;
+
+    cam.dist += (cam.targetDist - cam.dist) * 0.15;
+    for (let k=0; k<3; k++) cam.tgt[k] += (cam.targetTgt[k] - cam.tgt[k]) * 0.15;
+    const ex = cam.tgt[0] + cam.dist*Math.cos(cam.pitch)*Math.sin(cam.yaw);
+    const ey = cam.tgt[1] + cam.dist*Math.sin(cam.pitch);
+    const ez = cam.tgt[2] + cam.dist*Math.cos(cam.pitch)*Math.cos(cam.yaw);
+    const VP = mat4Mul(mat4Perspective(0.75, w/h, 0.2, 4000.0), mat4LookAt([ex,ey,ez], cam.tgt, [0,1,0]));
+    gl.uniform3f(loc.uLightDir, 0.45, 0.80, 0.39);
+
+    const tSec = nowMs * 0.001, wm = scene3d.wave_motion, om = 2*Math.PI/Math.max(2.0, wm.tp_s);
+    const phase = waveAnimOn ? om * tSec : 0.0;
+    const heave = 0.65*wm.heave_amp_m*Math.sin(phase), surge = 0.55*wm.surge_amp_m*Math.cos(phase);
+    const pitchR = (wm.pitch_amp_deg*Math.PI/180.0)*0.65*Math.sin(phase+0.5);
+    const hullM = mat4Mul(mat4Translate(surge, heave, 0), mat4RotateZ(-pitchR));
+    drawMesh(gpuBuffers.opaqueHull, hullM, VP, 1.0);
+
+    const pto = scene3d.internal_pto_3d;
+    drawMesh(gpuBuffers.ballast, mat4Mul(hullM, mat4Translate(0, pto.ballast_disc.z_center, 0)), VP, 1.0);
+    drawMesh(gpuBuffers.cgMesh, mat4Mul(hullM, mat4Translate(...toGL(pto.cg_point))), VP, 1.0);
+    drawMesh(gpuBuffers.cbMesh, mat4Mul(hullM, mat4Translate(...toGL(pto.cb_point))), VP, 1.0);
+    if (pto.architecture === "arch_a_heave") {
+      const yMid = 0.5*(pto.rail_z_min+pto.rail_z_max);
+      drawMesh(gpuBuffers.ptoRail, mat4Mul(hullM, mat4Translate(0, yMid, -pto.rail_offset_y)), VP, 1.0);
+      drawMesh(gpuBuffers.ptoRail, mat4Mul(hullM, mat4Translate(0, yMid, +pto.rail_offset_y)), VP, 1.0);
+      const q4 = Math.min(pto.stroke_limit_m*0.7, 0.8*wm.pto_amp)*Math.cos(phase+1.1);
+      drawMesh(gpuBuffers.ptoMain, mat4Mul(hullM, mat4Translate(0, pto.z_center+q4, 0)), VP, 1.0);
+    } else if (pto.architecture === "arch_b_pendulum") {
+      const phi = Math.min(0.85, 1.1*wm.pto_amp)*Math.sin(phase+0.8), alR = pto.alpha_deg*Math.PI/180.0;
+      const pivM = mat4Mul(hullM, mat4Mul(mat4Translate(0, pto.z_pivot, 0), mat4Mul(mat4RotateX(alR), mat4RotateZ(phi))));
+      drawMesh(gpuBuffers.ptoArm, mat4Mul(pivM, mat4Translate(0, -0.5*pto.arm_length_m, 0)), VP, 1.0);
+      drawMesh(gpuBuffers.ptoBob, mat4Mul(pivM, mat4Translate(0, -pto.arm_length_m, 0)), VP, 1.0);
+    } else {
+      const eps = Math.min(1.0, 1.2*wm.pto_amp)*Math.cos(phase+0.4), spin = waveAnimOn ? tSec*12.0 : 0.0;
+      const gM = mat4Mul(hullM, mat4Mul(mat4Translate(0, pto.z_center, 0), mat4RotateX(eps)));
+      drawMesh(gpuBuffers.ptoGimbal, gM, VP, 1.0);
+      drawMesh(gpuBuffers.ptoFw, mat4Mul(gM, mat4RotateY(spin)), VP, 1.0);
+    }
+
+    if (viewMode === "mooring") {
+      drawMesh(gpuBuffers.seabed, mat4Identity(), VP, 1.0);
+      drawMesh(gpuBuffers.watchCircle, mat4Identity(), VP, 1.0);
+      scene3d.mooring_3d.lines.forEach((ln, idx) => {
+        drawMesh(gpuBuffers.mooring[idx], mat4Identity(), VP, 1.0);
+        const aGL = toGL(ln.anchor);
+        drawMesh(gpuBuffers.anchors[idx], mat4Translate(aGL[0], aGL[1], aGL[2]), VP, 1.0);
+      });
+    } else {
+      scene3d.mooring_3d.lines.forEach((_, idx) => drawMesh(gpuBuffers.mooring[idx], mat4Identity(), VP, 1.0));
+    }
+
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    drawWaveGrid(tSec, VP);
+    if (cutawayOn && gpuBuffers.glassHull) drawMesh(gpuBuffers.glassHull, hullM, VP, 0.16);
+    gl.depthMask(true); gl.disable(gl.BLEND);
+  }
+
+  // ---------- Wave Map & Power Matrix ----------
+  function drawWaveMap() {
+    const c = $("mapCanvas"), ctx = c.getContext("2d"), W = c.width, H = c.height;
+    ctx.fillStyle = "#07101f"; ctx.fillRect(0,0,W,H);
+    const lonMin=-168, lonMax=-52, latMin=17, latMax=63;
+    const toXY = (la, lo) => [((lo-lonMin)/(lonMax-lonMin))*W, (1-(la-latMin)/(latMax-latMin))*H];
+
+    ctx.strokeStyle="#16243d"; ctx.lineWidth=1;
+    for (let lo=-160; lo<=-60; lo+=20) { const [x]=toXY(30,lo); ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let la=20; la<=60; la+=10) { const [,y]=toXY(la,-100); ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    const naPoly = [[61,-162],[60,-148],[57,-136],[51,-128],[48,-124],[41,-124],[34,-120],[23,-110],[19,-96],[26,-97],[29,-89],[25,-80],[32,-81],[36,-75],[41,-71],[45,-66],[47,-53],[55,-60],[60,-65],[61,-162]];
+    ctx.fillStyle="#1a263b"; ctx.strokeStyle="#334155"; ctx.beginPath();
+    naPoly.forEach((pt,i)=>{ const [x,y]=toXY(pt[0],pt[1]); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    for (const pt of sitePoints) {
+      const [x, y] = toXY(pt.lat, pt.lon);
+      const t = Math.min(1, Math.max(0, pt.J_mean_kW_m / 60.0));
+      ctx.fillStyle = `rgb(${Math.floor(255*Math.min(1,Math.max(0,t*2-0.3)))},${Math.floor(255*Math.sin(Math.PI*t))},${Math.floor(255*Math.max(0,1-t*1.4))})`;
+      ctx.fillRect(x-1, y-1, 2.5, 2.5);
+    }
+    if (!apiConfig.enabled && BUNDLE) {
+      for (const s of BUNDLE.sites) {
+        const [x, y] = toXY(s.lat, s.lon);
+        ctx.fillStyle = "rgba(56,189,248,0.85)";
+        ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 2*Math.PI); ctx.fill();
+      }
+    }
+    const curLat = parseFloat($("inLat").value)||50.8, curLon = parseFloat($("inLon").value)||-129.0;
+    const [sx, sy] = toXY(curLat, curLon);
+    ctx.strokeStyle="#facc15"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(sx,sy,6,0,2*Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx-9,sy); ctx.lineTo(sx+9,sy); ctx.moveTo(sx,sy-9); ctx.lineTo(sx,sy+9); ctx.stroke();
+  }
+
+  function drawPowerMatrix(pmat) {
+    const c=$("pmCanvas"), ctx=c.getContext("2d"), W=c.width, H=c.height;
+    ctx.fillStyle="#07101f"; ctx.fillRect(0,0,W,H);
+    if (!pmat || !pmat.length) return;
+    let maxP = 1.0;
+    for (const row of pmat) for (const v of row) if (v > maxP) maxP = v;
+    const nh=pmat.length, nt=pmat[0].length, padL=32, padB=18, cw=(W-padL-6)/nt, ch=(H-padB-6)/nh;
+    for (let i=0; i<nh; i++) for (let j=0; j<nt; j++) {
+      const t = Math.min(1, pmat[i][j]/maxP);
+      ctx.fillStyle = t < 0.005 ? "#0b1322" : `rgb(${Math.floor(20+235*Math.pow(t,1.2))},${Math.floor(30+195*Math.sin(Math.PI*0.85*t))},${Math.floor(110+130*(1-t))})`;
+      ctx.fillRect(padL+j*cw, (H-padB)-(i+1)*ch, cw+0.5, ch+0.5);
+    }
+    ctx.fillStyle="#94a3b8"; ctx.font="10px sans-serif";
+    ctx.fillText("Te [4.5 .. 19.5 s]", W*0.42, H-4); ctx.fillText("Hs", 4, 14); ctx.fillText(`${maxP.toFixed(0)}kW`, W-40, 12);
+  }
+
+  // ---------- Client-Side Static Showcase Evaluator ----------
+  function filterShowcaseHulls(fabFilter) {
+    if (!BUNDLE) return [];
+    return BUNDLE.hulls.filter(h => {
+      const isSub = h.submergence_m < -1e-4;
+      if (fabFilter === "commercial_archetypes") return ["commercial_pa_archetypes", "canonical_baseline", "aspect_ratio_and_calwave"].includes(h.family);
+      if (fabFilter === "flat_panel_weldable") return ["cube", "hexagon", "octagon", "decagon", "dodecagon", "triangle_wedge"].includes(h.planform) && ["vertical", "flared"].includes(h.side_profile);
+      if (fabFilter === "axisymmetric_rolled") return h.planform === "cylinder";
+      if (fabFilter === "chamfered_or_filleted") return h.id.includes("fillet") || h.id.includes("chamfer");
+      if (fabFilter === "surface_piercing") return !isSub;
+      if (fabFilter === "submerged_stealth") return isSub;
+      return true;
+    }).map(h => h.id);
+  }
+
+  function decodePm(pmObj) {
+    const out = [];
+    for (let i=0; i<20; i++) {
+      const row = [];
+      for (let j=0; j<16; j++) row.push(+((pmObj.q[i*16+j]/255)*pmObj.pmax_kw).toFixed(2));
+      out.push(row);
+    }
+    return out;
+  }
+
+  function buildShowcaseMooringLines(rFair, zFair, rAnc, depthM, nLines) {
+    const lines = [];
+    for (let k=0; k<nLines; k++) {
+      const phi = (2*Math.PI*k)/nLines, cp=Math.cos(phi), sp=Math.sin(phi), pts=[];
+      for (let i=0; i<=24; i++) {
+        const s = i/24;
+        const rad = rFair + (rAnc - rFair)*s;
+        const zCat = zFair + (-depthM - zFair)*Math.pow(s, 0.72) - 0.14*depthM*Math.sin(Math.PI*s)*(1-0.3*s);
+        pts.push([+(rad*cp).toFixed(2), +(rad*sp).toFixed(2), +Math.max(-depthM, zCat).toFixed(2)]);
+      }
+      lines.push({ points: pts, fairlead: pts[0], anchor: pts[pts.length-1], azimuth_deg: +(phi*180/Math.PI).toFixed(1) });
+    }
+    return lines;
+  }
+
+  function buildShowcaseAssessment(siteObj, recKey, overrides={}) {
+    const baseRec = BUNDLE.records[recKey];
+    const hullMeta = BUNDLE.hulls.find(h => h.id === baseRec.hull_id);
+    const dUse = overrides.d_circ || baseRec.d_ref;
+    const unitsUse = overrides.units || baseRec.units_ref;
+    const lam = dUse / baseRec.d_ref;
+    const draft = +(baseRec.draft_ref * lam).toFixed(2);
+    const fb = +(baseRec.freeboard_ref * lam).toFixed(2);
+    const subm = +(baseRec.subm_ref * lam).toFixed(2);
+    const hullH = +(baseRec.height_ref * lam).toFixed(2);
+    const mass = +(baseRec.mass_ref_t * Math.pow(lam, 3)).toFixed(2);
+    const gm = +(baseRec.gm_ref * lam).toFixed(2);
+    const keelD = subm < -1e-4 ? Math.abs(subm) + draft : draft;
+
+    const scalePow = Math.pow(lam, 2.2);
+    const ratedKw = overrides.rated_kw || baseRec.rated_kw;
+    const aepUnit = +(baseRec.aep_unit_mwh * Math.min(1.65, scalePow) * Math.min(1.3, ratedKw / baseRec.rated_kw)).toFixed(1);
+    const aepArr = +(aepUnit * unitsUse).toFixed(1);
+    const capexScale = 0.55 + 0.45 * Math.pow(lam, 2.3);
+    const capexTotal = +(baseRec.capex_total_k * (unitsUse / baseRec.units_ref) * capexScale).toFixed(1);
+    const lcoe = +(baseRec.lcoe * (capexTotal / Math.max(1, baseRec.capex_total_k)) * (baseRec.aep_unit_mwh * baseRec.units_ref / Math.max(1, aepArr))).toFixed(3);
+    const npvK = +(baseRec.npv_20yr_k * (unitsUse / baseRec.units_ref) * Math.min(1.4, aepUnit / Math.max(1, baseRec.aep_unit_mwh))).toFixed(1);
+
+    const moorCfg = (overrides.moor_cfg && overrides.moor_cfg !== "auto") ? overrides.moor_cfg : baseRec.moor_cfg;
+    const nLines = overrides.n_lines || baseRec.n_lines;
+    const anchorType = (overrides.anchor_type && overrides.anchor_type !== "auto") ? overrides.anchor_type : baseRec.anchor_type;
+    let rAnc = baseRec.anchor_r_m * (moorCfg.includes("taut") ? 0.65 : 1.0);
+    if (overrides.max_anchor_radius_m && rAnc > overrides.max_anchor_radius_m && moorCfg.includes("taut")) rAnc = overrides.max_anchor_radius_m * 0.96;
+    rAnc = +rAnc.toFixed(1);
+    const upliftDeg = moorCfg.includes("taut") ? 28.0 : 0.0;
+    const upliftPass = upliftDeg <= 2.5 || anchorType.includes("suction") || anchorType.includes("drilled") || anchorType.includes("Pile");
+    const ulsSf = +(baseRec.uls_sf * (nLines / baseRec.n_lines) / Math.pow(lam, 1.1)).toFixed(2);
+
+    const checks = [
+      { id:"gm_stability", label:"Intact Metacentric Stability (GM)", pass: gm >= (subm < -1e-4 ? 0.04*hullH : 0.20), value_str:`${gm.toFixed(2)} m`, limit_str: subm < -1e-4 ? ">= 4% H" : ">= 0.20 m", severity:"critical", hint:"Increase hull diameter or lower reaction mass ratio." },
+      { id:"uls_sf_mbl", label:"50-Yr Storm Mooring Safety Factor", pass: ulsSf >= 1.85, value_str:`SF ${ulsSf.toFixed(2)}`, limit_str:">= 1.85 (DNV-OS-E301)", severity:"critical", hint:"Increase line count/grade or reduce D_circ." },
+      { id:"anchor_uplift", label:"Seabed Anchor Uplift Check", pass: upliftPass, value_str:`${upliftDeg.toFixed(1)} deg`, limit_str:"<= 2.5 deg (drag) / Uplift-OK", severity:"critical", hint:"Switch drag-embedment anchor to Suction or Drilled Pile for taut moorings." },
+      { id:"seabed_clearance", label:"Keel Seabed Under-Clearance", pass: keelD <= 0.60*siteObj.depth_m, value_str:`${keelD.toFixed(1)} m / ${siteObj.depth_m.toFixed(0)} m`, limit_str:`<= ${(0.60*siteObj.depth_m).toFixed(1)} m (60% depth)`, severity:"critical", hint:"Reduce diameter or pick a shallower hull." },
+      { id:"mathieu_pitch", label:"Steep-Wave Mathieu 2:1 Pitch Stability", pass: baseRec.mathieu < 1.0, value_str:`${baseRec.mathieu.toFixed(3)}`, limit_str:"< 1.000", severity:"warning", hint:"Adjust tuned period to avoid 2:1 parametric resonance." },
+    ];
+    if (overrides.max_draft_m) {
+      checks.push({ id:"harbor_draft", label:"Harbor / Deployment Draft Limit", pass: keelD <= overrides.max_draft_m + 0.01, value_str:`${keelD.toFixed(2)} m`, limit_str:`<= ${overrides.max_draft_m.toFixed(1)} m`, severity:"warning", hint:"Select a shallower hull or smaller D_circ." });
+    }
+    if (overrides.max_anchor_radius_m) {
+      checks.push({ id:"watch_circle", label:"Lease Anchor Radius Limit", pass: rAnc <= overrides.max_anchor_radius_m + 0.5, value_str:`${rAnc.toFixed(1)} m`, limit_str:`<= ${overrides.max_anchor_radius_m.toFixed(1)} m`, severity:"warning", hint:"Use taut synthetic/buoyant mooring to tighten watch circle." });
+    }
+
+    const scaledVerts = hullMeta.mesh.v.map(p => [+(p[0]*dUse).toFixed(3), +(p[1]*dUse).toFixed(3), +(p[2]*dUse).toFixed(3)]);
+    const zKeel = hullMeta.mesh.z_keel_n * dUse, zTop = hullMeta.mesh.z_top_n * dUse, hh = Math.max(0.5, zTop - zKeel);
+    const rWl = 0.5 * dUse, rIn = 0.72 * rWl * (hullMeta.side_profile === "stepped_spar" ? 0.65 : 1.0);
+    const pto3d = {
+      architecture: baseRec.arch,
+      ballast_disc: { z_center: +(zKeel + 0.12*hh).toFixed(3), radius: +(0.62*rIn).toFixed(3), height: +Math.max(0.18, 0.08*hh).toFixed(3) },
+      cg_point: [0, 0, +(baseRec.cg_z_ref*lam).toFixed(3)],
+      cb_point: [0, 0, +(zKeel + 0.45*draft).toFixed(3)],
+      z_keel: +zKeel.toFixed(3), z_top: +zTop.toFixed(3),
+      z_center: +(zKeel + 0.44*hh).toFixed(3),
+      mass_radius: +(0.46*rIn).toFixed(3), mass_height: +Math.max(0.35, 0.16*hh).toFixed(3),
+      stroke_limit_m: +(0.34*hh).toFixed(3),
+      rail_z_min: +(zKeel + 0.18*hh).toFixed(3), rail_z_max: +(zTop - 0.10*hh).toFixed(3), rail_offset_y: +(0.48*rIn).toFixed(3),
+      z_pivot: +(zKeel + 0.72*hh).toFixed(3), arm_length_m: +Math.min(0.65*rWl, 0.48*hh).toFixed(3), alpha_deg: overrides.alpha_deg || baseRec.alpha_deg,
+      bob_radius: +Math.max(0.28, Math.min(0.28*rIn, 0.24*hh)).toFixed(3),
+      flywheel_radius: +Math.min(0.42*rWl, 0.34*hh).toFixed(3), flywheel_thickness: +Math.max(0.22, 0.28*Math.min(0.42*rWl, 0.34*hh)).toFixed(3),
+      gimbal_radius: +(1.18*Math.min(0.42*rWl, 0.34*hh)).toFixed(3),
+    };
+    const rFair = +(baseRec.fair_r_m * lam).toFixed(2), zFair = +(baseRec.fair_z_m * lam).toFixed(2);
+    const tpS = +(siteObj.te_mean_s / 0.8572).toFixed(2);
+
+    const out = {
+      site: { region: siteObj.region, matched_lat: siteObj.lat, matched_lon: siteObj.lon, depth_m: siteObj.depth_m, J_mean_kW_m: siteObj.J_mean_kW_m, hs_mean_m: siteObj.hs_mean_m, te_mean_s: siteObj.te_mean_s, hs50_m: siteObj.hs50_m },
+      is_custom: !!overrides.is_custom,
+      all_checks_pass: checks.every(c => c.pass),
+      engineering_checks: checks,
+      recommended: {
+        hull: { shape_id: baseRec.hull_id, circumdiameter_m: +dUse.toFixed(2), draft_m: draft, freeboard_m: fb, gm_m: gm, dry_mass_t: mass },
+        internal_pto: { architecture: baseRec.arch, rated_power_kW: ratedKw, tuned_period_s: overrides.tp_tune || baseRec.tp_tune, shaft_inclination_deg: overrides.alpha_deg || baseRec.alpha_deg, flywheel_material: baseRec.fw_mat, flywheel_rpm: baseRec.fw_rpm },
+        mooring_and_anchors: { n_lines: nLines, configuration: moorCfg, line_spec: baseRec.line_spec, anchor_type: anchorType, anchor_radius_m: rAnc },
+        performance: { aep_p50_MWh_yr: aepUnit, capacity_factor_pct: baseRec.cf_pct, capture_width_ratio_pct: baseRec.cwr_pct },
+        economics: { aep_array_mwh: aepArr, lcoe_usd_kwh: lcoe, capex_total_kUSD: capexTotal },
+        uls_50yr_audit: { sf_mbl_3h: ulsSf, uls_pass: ulsSf >= 1.85 && upliftPass, theta_anch_max_deg: upliftDeg },
+        power_matrix_20x16_kW: decodePm(baseRec.pm),
+      },
+      nonlinear_audit: { nl_vs_lin_power_ratio_steep: baseRec.nl_ratio, mathieu_index_steep: baseRec.mathieu, parametric_pitch_safe: baseRec.mathieu < 1.0 },
+      customer_roi: { incumbent_benchmark_usd_kwh: baseRec.incumbent_lcoe, npv_20yr_usd: npvK * 1000.0, simple_payback_yr: baseRec.payback_yr },
+      scene_3d: {
+        hull_mesh: { vertices: scaledVerts, faces: hullMeta.mesh.f, cutaway_mask: hullMeta.mesh.cut, z_keel: +zKeel.toFixed(3), z_top: +zTop.toFixed(3), r_wl: +rWl.toFixed(3) },
+        internal_pto_3d: pto3d,
+        mooring_3d: { depth_m: siteObj.depth_m, anchor_radius_m: rAnc, configuration: moorCfg, line_spec: baseRec.line_spec, anchor_type: anchorType, lines: buildShowcaseMooringLines(rFair, zFair, rAnc, siteObj.depth_m, nLines) },
+        wave_motion: { hs_m: siteObj.hs_mean_m, tp_s: tpS, heave_amp_m: +(0.45*siteObj.hs_mean_m).toFixed(2), surge_amp_m: +(0.38*siteObj.hs_mean_m).toFixed(2), pitch_amp_deg: 5.2, pto_amp: 0.38 },
+      },
+    };
+    if (overrides.is_custom && baselineAssessment) {
+      const bR = baselineAssessment.recommended, bEc = bR.economics, bNpv = baselineAssessment.customer_roi.npv_20yr_usd / 1000.0;
+      out.comparison_vs_baseline = {
+        baseline_hull: bR.hull.shape_id, baseline_pto: bR.internal_pto.architecture,
+        delta_aep_mwh_yr: +(aepArr - bEc.aep_array_mwh).toFixed(1),
+        delta_aep_pct: +(((aepArr / Math.max(0.1, bEc.aep_array_mwh)) - 1.0)*100.0).toFixed(1),
+        delta_lcoe_usd_kwh: +(lcoe - bEc.lcoe_usd_kwh).toFixed(3),
+        delta_capex_kUSD: +(capexTotal - bEc.capex_total_kUSD).toFixed(1),
+        delta_dry_mass_t: +(mass - bR.hull.dry_mass_t).toFixed(1),
+        delta_anchor_radius_m: +(rAnc - bR.mooring_and_anchors.anchor_radius_m).toFixed(1),
+        delta_uls_sf: +(ulsSf - bR.uls_50yr_audit.sf_mbl_3h).toFixed(2),
+        delta_npv_kUSD: +(npvK - bNpv).toFixed(1),
+      };
+    }
+    return out;
+  }
+
+  // ---------- UI Binding ----------
+  function populateHullSelect(famFilter="all") {
+    const sel=$("custHull"), prev=sel.value; sel.innerHTML="";
+    const list = apiConfig.enabled ? catalog.hulls_detailed : BUNDLE.hulls;
+    for (const h of list) {
+      if (famFilter !== "all" && h.family !== famFilter) continue;
+      const opt = document.createElement("option"); opt.value=h.id; opt.textContent=`${h.id} (${h.planform}, ${h.bottom_shape})`;
+      sel.appendChild(opt);
+    }
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+    updateHullDesc();
+  }
+  function updateHullDesc() {
+    const list = apiConfig.enabled ? catalog.hulls_detailed : BUNDLE.hulls;
+    const h = list.find(x => x.id === $("custHull").value);
+    if (h) $("custHullDesc").textContent = `${h.description} | H/W=${h.height_width_ratio} | Subm=${h.submergence_m}m`;
+  }
+  function updatePtoOptionVisibility() {
+    const a = $("custArch").value;
+    $("pendulumOpts").style.display = a === "arch_b_pendulum" ? "block" : "none";
+    $("gyroOpts").style.display = a === "arch_c_gyro" ? "block" : "none";
+  }
+  function syncRightControlsFromAssessment(ass) {
+    const rec=ass.recommended, h=rec.hull, p=rec.internal_pto, m=rec.mooring_and_anchors;
+    $("custFamFilter").value="all"; populateHullSelect("all");
+    $("custHull").value=h.shape_id; updateHullDesc();
+    $("custDcirc").value=h.circumdiameter_m; $("custDcircNum").value=h.circumdiameter_m; $("lblDcirc").textContent=`${h.circumdiameter_m} m`;
+    $("custArch").value=p.architecture; updatePtoOptionVisibility();
+    $("custRatedKw").value=p.rated_power_kW; $("custTpTune").value=p.tuned_period_s;
+    if (p.shaft_inclination_deg) $("custAlpha").value=p.shaft_inclination_deg;
+    if (p.flywheel_material) $("custFwMat").value=p.flywheel_material;
+    if (p.flywheel_rpm) $("custFwRpm").value=p.flywheel_rpm;
+    $("custMoorCfg").value=m.configuration; $("custNlines").value=String(m.n_lines);
+  }
+
+  function renderAssessment(ass) {
+    activeAssessment = ass; scene3d = ass.scene_3d;
+    const rec=ass.recommended, h=rec.hull, p=rec.internal_pto, m=rec.mooring_and_anchors;
+    const econ=rec.economics, uls=rec.uls_50yr_audit, nl=ass.nonlinear_audit, roi=ass.customer_roi, site=ass.site;
+
+    $("modeBadge").textContent = ass.is_custom ? "Custom User Configuration" : "AI Optimal Baseline";
+    $("modeBadge").className = "pill " + (ass.all_checks_pass ? "pill-ok" : "pill-bad");
+    $("siteSummaryTxt").textContent = `${site.region} (J=${site.J_mean_kW_m} kW/m, d=${site.depth_m.toFixed(0)}m)`;
+    $("kpiDesign").textContent = h.shape_id;
+    $("kpiDesignSub").textContent = `${p.architecture} | D=${h.circumdiameter_m}m | ${m.n_lines}x ${m.line_spec}`;
+    $("kpiAep").textContent = `${econ.aep_array_mwh} MWh/yr`;
+    $("kpiAepDelta").textContent = `CF ${rec.performance.capacity_factor_pct}% | CWR ${rec.performance.capture_width_ratio_pct}%`;
+    $("kpiLcoe").textContent = `$${econ.lcoe_usd_kwh.toFixed(3)}/kWh`;
+    $("kpiLcoeDelta").textContent = `vs $${roi.incumbent_benchmark_usd_kwh.toFixed(3)} incumbent`;
+    $("kpiNpv").textContent = `$${econ.capex_total_kUSD.toFixed(0)}k`;
+    $("kpiNpvDelta").textContent = `20y NPV $${(roi.npv_20yr_usd/1000).toFixed(0)}k (${roi.simple_payback_yr ?? 'N/A'} yr)`;
+    $("kpiUls").textContent = `SF ${uls.sf_mbl_3h.toFixed(2)} (${uls.uls_pass ? 'PASS' : 'FAIL'})`;
+    $("kpiUlsSub").textContent = `R_anc=${m.anchor_radius_m}m | Uplift=${uls.theta_anch_max_deg.toFixed(1)} deg`;
+    $("kpiNl").textContent = `${nl.nl_vs_lin_power_ratio_steep}x NL`;
+    $("kpiNlSub").textContent = `Mathieu ${nl.mathieu_index_steep} (${nl.parametric_pitch_safe ? 'Safe' : 'Risk'})`;
+
+    $("hudSpecs").innerHTML = `
+      <span>Hull: <b>${h.shape_id}</b></span><span>D_circ: <b>${h.circumdiameter_m} m</b></span>
+      <span>Draft: <b>${h.draft_m} m</b></span><span>GM: <b>${h.gm_m} m</b></span>
+      <span>Mass: <b>${h.dry_mass_t} t</b></span><span>Depth: <b>${site.depth_m.toFixed(0)} m</b></span>
+      <span>Mooring: <b>${m.n_lines}x ${m.configuration} (${m.anchor_type})</b></span>`;
+
+    const gList=$("guardrailsList"), gPills=$("guardrailHeaderPills"); gList.innerHTML=""; gPills.innerHTML="";
+    let nPass = 0;
+    for (const ch of ass.engineering_checks) {
+      if (ch.pass) nPass++;
+      const cls = ch.pass ? "chk-row" : (ch.severity === "critical" ? "chk-row fail" : "chk-row warn");
+      gList.innerHTML += `<div class="${cls}" title="${ch.hint}"><span><b>${ch.label}</b>: ${ch.value_str}</span><span>${ch.pass ? 'PASS' : 'FAIL'} (${ch.limit_str})</span></div>`;
+    }
+    gPills.innerHTML = `<span class="pill ${ass.all_checks_pass ? 'pill-ok' : 'pill-bad'}">${nPass}/${ass.engineering_checks.length} Engineering Guardrails Pass</span>`;
+
+    const cmp = ass.comparison_vs_baseline;
+    if (cmp) {
+      const fmtD = (v, unit, inv=false) => `<span class="${(inv ? v<=0 : v>=0) ? 'delta-pos' : 'delta-neg'}">${v>=0?'+':''}${v}${unit}</span>`;
+      $("deltaSummaryBox").innerHTML = `
+        <div><b>Baseline:</b> ${cmp.baseline_hull} + ${cmp.baseline_pto}</div>
+        <div style="margin-top:4px;">&Delta;AEP: ${fmtD(cmp.delta_aep_mwh_yr,' MWh/yr')} (${cmp.delta_aep_pct}%)</div>
+        <div>&Delta;LCOE: ${fmtD(cmp.delta_lcoe_usd_kwh,' $/kWh',true)} | &Delta;CAPEX: ${fmtD(cmp.delta_capex_kUSD,'k',true)}</div>
+        <div>&Delta;Mass: ${fmtD(cmp.delta_dry_mass_t,' t',true)} | &Delta;Anchor R: ${fmtD(cmp.delta_anchor_radius_m,' m',true)}</div>
+        <div>&Delta;ULS SF: ${fmtD(cmp.delta_uls_sf,'')} | &Delta;NPV: ${fmtD(cmp.delta_npv_kUSD,'k')}</div>`;
+    } else {
+      $("deltaSummaryBox").textContent = "Showing AI site-optimal baseline across allowed showcase constraints.";
+    }
+    drawWaveMap(); drawPowerMatrix(rec.power_matrix_20x16_kW); rebuildSceneBuffers(); updateCameraTargetForView(true);
+  }
+
+  async function runRecommend() {
+    if (!apiConfig.enabled) {
+      const sObj = BUNDLE.sites.find(s => s.id === $("sitePreset").value) || BUNDLE.sites[0];
+      activeSite = sObj;
+      const fab = $("inFabFilter").value;
+      const allowed = filterShowcaseHulls(fab);
+      let bestKey = `${sObj.id}|${sObj.optimal_hull}|${sObj.optimal_arch}`;
+      if (!allowed.includes(sObj.optimal_hull) && allowed.length) {
+        let bestLcoe = 1e9;
+        for (const hid of allowed) for (const arch of Object.keys(BUNDLE.ptos)) {
+          const k = `${sObj.id}|${hid}|${arch}`, rec = BUNDLE.records[k];
+          if (rec && rec.lcoe < bestLcoe) { bestLcoe = rec.lcoe; bestKey = k; }
+        }
+      }
+      const ass = buildShowcaseAssessment(sObj, bestKey, {
+        units: parseInt($("inUnits").value, 10) || sObj.default_units,
+        rated_kw: parseFloat($("inTargetKw").value) || sObj.default_kw,
+        max_draft_m: $("inMaxDraft").value ? parseFloat($("inMaxDraft").value) : null,
+        max_anchor_radius_m: $("inMaxAncR").value ? parseFloat($("inMaxAncR").value) : null,
+      });
+      baselineAssessment = ass;
+      syncRightControlsFromAssessment(ass);
+      renderAssessment(ass);
+      setStatus("Showcase Optimal Ready");
+      return;
+    }
+
+    setStatus("Co-optimizing 150 hulls + moorings...", true);
+    const pl = {
+      lat: parseFloat($("inLat").value), lon: parseFloat($("inLon").value),
+      use_case: $("inUseCase").value, target_rated_kw: parseFloat($("inTargetKw").value),
+      units: parseInt($("inUnits").value, 10), offgrid_local_use: $("inOffgrid").value === "1",
+      diesel_usd_per_l: parseFloat($("inDiesel").value), include_3d_scene: true,
+      constraints: {
+        fabrication_filter: $("inFabFilter").value,
+        max_draft_m: $("inMaxDraft").value ? parseFloat($("inMaxDraft").value) : null,
+        max_anchor_radius_m: $("inMaxAncR").value ? parseFloat($("inMaxAncR").value) : null,
+      },
+    };
+    const r = await apiFetch("/api/v1/recommend", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(pl) });
+    const data = await r.json();
+    if (r.ok) { baselineAssessment = data; syncRightControlsFromAssessment(data); renderAssessment(data); setStatus("Live Private API Ready"); }
+    else setStatus("Error: " + (data.error || "API error"));
+  }
+
+  async function runCustomize() {
+    if (!apiConfig.enabled) {
+      const sObj = activeSite || BUNDLE.sites[0];
+      const recKey = `${sObj.id}|${$("custHull").value}|${$("custArch").value}`;
+      if (!BUNDLE.records[recKey]) { setStatus("Combination not in 12-hull showcase"); return; }
+      const ass = buildShowcaseAssessment(sObj, recKey, {
+        is_custom: true,
+        d_circ: parseFloat($("custDcircNum").value),
+        units: parseInt($("inUnits").value, 10),
+        rated_kw: parseFloat($("custRatedKw").value),
+        tp_tune: parseFloat($("custTpTune").value),
+        alpha_deg: parseFloat($("custAlpha").value),
+        moor_cfg: $("custMoorCfg").value,
+        n_lines: $("custNlines").value ? parseInt($("custNlines").value, 10) : null,
+        anchor_type: $("custAnchor").value,
+        max_draft_m: $("inMaxDraft").value ? parseFloat($("inMaxDraft").value) : null,
+        max_anchor_radius_m: $("inMaxAncR").value ? parseFloat($("inMaxAncR").value) : null,
+      });
+      renderAssessment(ass);
+      setStatus("Showcase Custom Evaluated");
+      return;
+    }
+
+    setStatus("Evaluating custom 3D WEC...", true);
+    const pl = {
+      lat: parseFloat($("inLat").value), lon: parseFloat($("inLon").value),
+      use_case: $("inUseCase").value, hull_name: $("custHull").value,
+      circumdiameter_m: parseFloat($("custDcircNum").value), arch: $("custArch").value,
+      m2_fraction: parseFloat($("custM2").value), rated_power_kw: parseFloat($("custRatedKw").value),
+      tuned_period_s: parseFloat($("custTpTune").value), alpha_deg: parseFloat($("custAlpha").value),
+      flywheel_material: $("custFwMat").value, flywheel_rpm: parseFloat($("custFwRpm").value),
+      mooring_config: $("custMoorCfg").value, n_lines: $("custNlines").value ? parseInt($("custNlines").value, 10) : null,
+      line_name: $("custLine").value, anchor_type: $("custAnchor").value,
+      max_draft_m: $("inMaxDraft").value ? parseFloat($("inMaxDraft").value) : null,
+      max_anchor_radius_m: $("inMaxAncR").value ? parseFloat($("inMaxAncR").value) : null,
+      units: parseInt($("inUnits").value, 10), offgrid_local_use: $("inOffgrid").value === "1",
+      diesel_usd_per_l: parseFloat($("inDiesel").value), include_3d_scene: true,
+      baseline_assessment: baselineAssessment ? { recommended: baselineAssessment.recommended, customer_roi: baselineAssessment.customer_roi } : null,
+    };
+    const r = await apiFetch("/api/v1/customize", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(pl) });
+    const data = await r.json();
+    if (r.ok) { renderAssessment(data); setStatus("Custom Design Evaluated"); }
+    else setStatus("Error: " + (data.error || "API error"));
+  }
+
+  function wireEvents() {
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active")); btn.classList.add("active");
+        document.querySelectorAll(".tab-pane").forEach(p=>p.style.display="none"); $(btn.dataset.tab).style.display="block";
+      };
+    });
+    $("sitePreset").onchange = () => {
+      if (!apiConfig.enabled && BUNDLE) {
+        const sObj = BUNDLE.sites.find(s => s.id === $("sitePreset").value);
+        if (sObj) {
+          $("inLat").value = sObj.lat; $("inLon").value = sObj.lon;
+          $("inUseCase").value = sObj.use_case;
+          $("inTargetKw").value = sObj.default_kw; $("inUnits").value = sObj.default_units;
+          $("inDiesel").value = sObj.diesel_usd_l; $("inOffgrid").value = sObj.offgrid ? "1" : "0";
+        }
+      } else {
+        const opt = $("sitePreset").selectedOptions[0];
+        if (opt) { $("inLat").value = opt.dataset.lat; $("inLon").value = opt.dataset.lon; }
+      }
+      runRecommend();
+    };
+    $("mapCanvas").onclick = (ev) => {
+      const r=$("mapCanvas").getBoundingClientRect(), xf=(ev.clientX-r.left)/r.width, yf=(ev.clientY-r.top)/r.height;
+      const lonClick = -168 + xf * 116, latClick = 63 - yf * 46;
+      if (!apiConfig.enabled && BUNDLE) {
+        let best = BUNDLE.sites[0], bestD = 1e9;
+        for (const s of BUNDLE.sites) {
+          const d = (s.lat-latClick)**2 + (s.lon-lonClick)**2;
+          if (d < bestD) { bestD = d; best = s; }
+        }
+        $("sitePreset").value = best.id; $("sitePreset").onchange();
+      } else if (sitePoints.length) {
+        let best = sitePoints[0], bestD = 1e9;
+        for (const p of sitePoints) { const d=(p.lat-latClick)**2+(p.lon-lonClick)**2; if (d<bestD){bestD=d; best=p;} }
+        $("inLat").value = best.lat; $("inLon").value = best.lon; runRecommend();
+      }
+    };
+
+    $("custFamFilter").onchange = () => populateHullSelect($("custFamFilter").value);
+    $("custHull").onchange = updateHullDesc; $("custArch").onchange = updatePtoOptionVisibility;
+    $("custDcirc").oninput = () => { $("custDcircNum").value=$("custDcirc").value; $("lblDcirc").textContent=`${$("custDcirc").value} m`; };
+    $("custDcircNum").oninput = () => { $("custDcirc").value=$("custDcircNum").value; $("lblDcirc").textContent=`${$("custDcircNum").value} m`; };
+    $("custM2").oninput = () => { $("lblM2").textContent = $("custM2").value; };
+    $("btnRecommend").onclick = runRecommend;
+    $("btnApplyCustom").onclick = runCustomize;
+    $("btnResetBaseline").onclick = () => { if (baselineAssessment) { syncRightControlsFromAssessment(baselineAssessment); renderAssessment(baselineAssessment); setStatus("Reset to AI Baseline"); } };
+
+    $("btnViewHull").onclick = () => { viewMode="hull"; $("btnViewHull").classList.add("active"); $("btnViewMoor").classList.remove("active"); updateCameraTargetForView(false); };
+    $("btnViewMoor").onclick = () => { viewMode="mooring"; $("btnViewMoor").classList.add("active"); $("btnViewHull").classList.remove("active"); updateCameraTargetForView(false); };
+    $("btnCutaway").onclick = () => { cutawayOn=!cutawayOn; $("btnCutaway").textContent=`X-Ray Cutaway: ${cutawayOn?'ON':'OFF'}`; $("btnCutaway").classList.toggle("active",cutawayOn); rebuildSceneBuffers(); };
+    $("btnWaveAnim").onclick = () => { waveAnimOn=!waveAnimOn; $("btnWaveAnim").textContent=`Wave Animation: ${waveAnimOn?'ON':'OFF'}`; $("btnWaveAnim").classList.toggle("active",waveAnimOn); };
+
+    $("btnExportZip").onclick = async () => {
+      if (!apiConfig.enabled) { $("ipModal").style.display = "flex"; return; }
+      if (!activeAssessment) return;
+      setStatus("Packaging Pre-FEED ZIP...", true);
+      const clean = Object.assign({}, activeAssessment); delete clean.scene_3d;
+      const r = await apiFetch("/api/v1/export_zip", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ project_slug: activeAssessment.recommended.hull.shape_id+"_prefeed", assessment: clean }) });
+      const blob = await r.blob(), url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href=url; a.download=`PreFEED_${activeAssessment.recommended.hull.shape_id}.zip`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      setStatus("Pre-FEED .ZIP Exported");
+    };
+
+    $("btnCloseIpModal").onclick = () => { $("ipModal").style.display = "none"; };
+    $("btnSwitchToApiFromIp").onclick = () => { $("ipModal").style.display = "none"; $("apiModal").style.display = "flex"; };
+    $("btnConnectApi").onclick = () => { $("apiConnMsg").textContent = ""; $("apiModal").style.display = "flex"; };
+    $("btnCloseApiModal").onclick = () => { $("apiModal").style.display = "none"; };
+    $("btnDisconnectApi").onclick = () => { apiConfig = { enabled:false, baseUrl:"", token:"" }; $("apiModal").style.display="none"; bootShowcase(); };
+    $("btnSaveApi").onclick = async () => {
+      const url = $("apiUrlIn").value.trim().replace(/\/+$/, ""), tok = $("apiTokenIn").value.trim();
+      if (!url) { $("apiConnMsg").textContent = "Enter an API URL first."; return; }
+      $("apiConnMsg").textContent = "Checking endpoint...";
+      try {
+        apiConfig = { enabled:true, baseUrl:url, token:tok };
+        const rh = await apiFetch("/api/v1/health");
+        if (!rh.ok) throw new Error("HTTP " + rh.status);
+        const h = await rh.json();
+        $("apiModal").style.display = "none";
+        $("hullCountBadge").textContent = `Private API Connected | ${h.hulls_loaded} Hulls`;
+        $("hullCountBadge").className = "pill pill-ok";
+        $("tabHullBtn").textContent = `Hull (${h.hulls_loaded})`;
+        await bootPrivateApi();
+      } catch (e) {
+        apiConfig.enabled = false;
+        $("apiConnMsg").textContent = "Connection failed: " + e.message;
+      }
+    };
+
+    const glC = $("glCanvas");
+    glC.oncontextmenu = e => e.preventDefault();
+    glC.onmousedown = e => { dragMode = (e.button===2||e.shiftKey) ? "pan" : "orbit"; lastMx=e.clientX; lastMy=e.clientY; };
+    window.onmouseup = () => { dragMode = null; };
+    window.onmousemove = e => {
+      if (!dragMode) return;
+      const dx=e.clientX-lastMx, dy=e.clientY-lastMy; lastMx=e.clientX; lastMy=e.clientY;
+      if (dragMode==="orbit") { cam.yaw-=dx*0.008; cam.pitch=Math.max(-1.45,Math.min(1.45,cam.pitch+dy*0.008)); }
+      else { const ps=cam.targetDist*0.0014; cam.targetTgt[0]-=dx*Math.cos(cam.yaw)*ps; cam.targetTgt[2]+=dx*Math.sin(cam.yaw)*ps; cam.targetTgt[1]+=dy*ps; }
+    };
+    glC.onwheel = e => { e.preventDefault(); cam.targetDist = Math.max(4.0, Math.min(2500.0, cam.targetDist*(e.deltaY>0?1.12:0.89))); };
+  }
+
+  function bootShowcase() {
+    if (!BUNDLE) { setStatus("Demo bundle missing"); return; }
+    $("hullCountBadge").textContent = `Public Showcase | ${BUNDLE.meta.showcase_hulls_count}/${BUNDLE.meta.total_private_hulls} Hulls | IP-Protected`;
+    $("hullCountBadge").className = "pill pill-warn";
+    $("tabHullBtn").textContent = `Hull (${BUNDLE.meta.showcase_hulls_count} Demo)`;
+    sitePoints = BUNDLE.map_dots.map(d => ({ lat:d[0], lon:d[1], J_mean_kW_m:d[2], depth_m:d[3] }));
+
+    $("inUseCase").innerHTML=""; $("sitePreset").innerHTML=""; $("custFamFilter").innerHTML='<option value="all">All Showcase Families</option>';
+    for (const [k, uc] of Object.entries(BUNDLE.use_cases)) {
+      const o=document.createElement("option"); o.value=k; o.textContent=uc.label; $("inUseCase").appendChild(o);
+    }
+    for (const s of BUNDLE.sites) {
+      const o=document.createElement("option"); o.value=s.id; o.textContent=s.label; $("sitePreset").appendChild(o);
+    }
+    const fams = [...new Set(BUNDLE.hulls.map(h => h.family))].sort();
+    for (const f of fams) {
+      const o=document.createElement("option"); o.value=f; o.textContent=f; $("custFamFilter").appendChild(o);
+    }
+    populateHullSelect("all");
+    $("sitePreset").onchange();
+  }
+
+  async function bootPrivateApi() {
+    const [catRes, siteRes] = await Promise.all([apiFetch("/api/v1/catalog"), apiFetch("/api/v1/sites")]);
+    catalog = await catRes.json(); const sData = await siteRes.json();
+    sitePoints = sData.hindcast_points || [];
+    $("inUseCase").innerHTML=""; $("sitePreset").innerHTML=""; $("custFamFilter").innerHTML='<option value="all">All 9 Families</option>';
+    for (const [k, uc] of Object.entries(catalog.commercial_use_cases)) {
+      const o=document.createElement("option"); o.value=k; o.textContent=uc.label; $("inUseCase").appendChild(o);
+    }
+    for (const pr of sData.presets) {
+      const o=document.createElement("option"); o.value=pr.label; o.textContent=pr.label; o.dataset.lat=pr.lat; o.dataset.lon=pr.lon; $("sitePreset").appendChild(o);
+    }
+    for (const fam of Object.keys(catalog.hull_families).sort()) {
+      const o=document.createElement("option"); o.value=fam; o.textContent=`${fam} (${catalog.hull_families[fam]})`; $("custFamFilter").appendChild(o);
+    }
+    populateHullSelect("all");
+    await runRecommend();
+  }
+
+  initWebGL(); wireEvents(); requestAnimationFrame(renderFrame); bootShowcase();
+})();
+</script>
+</body>
+</html>
