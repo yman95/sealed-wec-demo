@@ -765,15 +765,20 @@
 
   function initWebGL() {
     const canvas = $("glCanvas");
-    gl = canvas.getContext("webgl", { antialias: true, alpha: false });
+    gl = canvas.getContext("webgl", { antialias: true, alpha: false, depth: true, powerPreference: "high-performance" });
     if (!gl) return;
     const vsSrc = `
+      precision highp float;
       attribute vec3 aPos; attribute vec3 aNorm; attribute vec3 aColor;
       uniform mat4 uMVP; uniform mat4 uModel;
       varying vec3 vNorm; varying vec3 vColor;
       void main() { gl_Position = uMVP * vec4(aPos, 1.0); vNorm = normalize(mat3(uModel) * aNorm); vColor = aColor; }`;
     const fsSrc = `
+      #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+      #else
       precision mediump float;
+      #endif
       varying vec3 vNorm; varying vec3 vColor;
       uniform vec3 uLightDir; uniform float uAlpha;
       void main() {
@@ -812,6 +817,8 @@
     };
     const wallT = cp.wall_thickness || Math.max(0.08, 0.048 * hm.r_wl);
     const inScaleXY = Math.max(0.76, 1.0 - wallT / Math.max(0.6, hm.r_wl));
+    const zMid = 0.5 * (hm.z_top + hm.z_keel);
+    const inScaleZ = Math.max(0.74, 1.0 - (2.2 * wallT) / hullH);
 
     const opPos=[], opNorm=[], opCol=[], inPos=[], inNorm=[], inCol=[];
     const bezPos=[], bezNorm=[], bezCol=[], glPos=[], glNorm=[], glCol=[];
@@ -832,7 +839,7 @@
 
     const addBezelOnCutEdges = (winPoly) => {
       if (winPoly.length < 3) return;
-      const inPt = p => [p[0]*inScaleXY, p[1]*inScaleXY, Math.max(hm.z_keel+0.02*hullH, Math.min(hm.z_top-0.02*hullH, p[2]))];
+      const inPt = p => [p[0]*inScaleXY, p[1]*inScaleXY, zMid + (p[2] - zMid)*inScaleZ];
       for (let i=0; i<winPoly.length; i++) {
         const p0 = winPoly[i].p, p1 = winPoly[(i+1)%winPoly.length].p;
         const onX = Math.abs(p0[0]-cp.x_cut)<1e-3 && Math.abs(p1[0]-cp.x_cut)<1e-3;
@@ -879,12 +886,13 @@
       }
     }
 
-    // Inner dark cavity liner for opaque portion (gives solid thick-shell look)
+    // Inner dark cavity liner for opaque portion (offset in 3D via inScaleXY & inScaleZ to avoid mobile Z-fighting)
     if (cutawayOn && opPos.length) {
       for (let k=0; k<opPos.length; k+=9) {
-        const p0=[opPos[k]*inScaleXY, opPos[k+1], opPos[k+2]*inScaleXY];
-        const p1=[opPos[k+3]*inScaleXY, opPos[k+4], opPos[k+5]*inScaleXY];
-        const p2=[opPos[k+6]*inScaleXY, opPos[k+7], opPos[k+8]*inScaleXY];
+        const y0 = opPos[k+1], y1 = opPos[k+4], y2 = opPos[k+7];
+        const p0=[opPos[k]*inScaleXY, zMid + (y0 - zMid)*inScaleZ, opPos[k+2]*inScaleXY];
+        const p1=[opPos[k+3]*inScaleXY, zMid + (y1 - zMid)*inScaleZ, opPos[k+5]*inScaleXY];
+        const p2=[opPos[k+6]*inScaleXY, zMid + (y2 - zMid)*inScaleZ, opPos[k+8]*inScaleXY];
         pushTri(inPos, inNorm, inCol, p0, p2, p1, cInner);
       }
     }
@@ -1024,7 +1032,7 @@
     return [cMid[0]+u*(cTrough[0]-cMid[0]), cMid[1]+u*(cTrough[1]-cMid[1]), cMid[2]+u*(cTrough[2]-cMid[2])];
   }
 
-  function drawWaveGrid(tSec, vpMat) {
+  function drawWaveGrid(tSec, vpMat, surgeX=0.0) {
     if (!scene3d) return;
     const wm=scene3d.wave_motion, hm=scene3d.hull_mesh, m=scene3d.mooring_3d;
     const ext = viewMode==="hull" ? Math.max(24, 3.1*hm.r_wl) : Math.max(60, 1.3*m.anchor_radius_m);
@@ -1032,11 +1040,14 @@
     const pos=[], norm=[], col=[], phaseT=waveAnimOn?tSec:0.0;
     const hFn = x => amp * Math.cos(kw * x - om * phaseT);
     const nFn = x => { const sl = -amp * kw * Math.sin(kw * x - om * phaseT); const l = Math.hypot(sl, 1); return [-sl/l, 1/l, 0]; };
+    const maskInnerHull = hm.z_top > 0.08;
+    const boreR = 0.78 * hm.r_wl;
     for (let i=0; i<N; i++) {
-      const x0=-ext+(2*ext*i)/N, x1=-ext+(2*ext*(i+1))/N;
+      const x0=-ext+(2*ext*i)/N, x1=-ext+(2*ext*(i+1))/N, mx=0.5*(x0+x1);
       const y0=hFn(x0), y1=hFn(x1), c0=waveHeightColor(y0, amp), c1=waveHeightColor(y1, amp), n0=nFn(x0), n1=nFn(x1);
       for (let j=0; j<N; j++) {
-        const z0=-ext+(2*ext*j)/N, z1=-ext+(2*ext*(j+1))/N;
+        const z0=-ext+(2*ext*j)/N, z1=-ext+(2*ext*(j+1))/N, mz=0.5*(z0+z1);
+        if (maskInnerHull && Math.hypot(mx - surgeX, mz) < boreR) continue;
         pushTri(pos,norm,col, [x0,y0,z0],[x0,y0,z1],[x1,y1,z1], c0,c0,c1, n0,n0,n1);
         pushTri(pos,norm,col, [x0,y0,z0],[x1,y1,z1],[x1,y1,z0], c0,c1,c1, n0,n1,n1);
       }
@@ -1053,7 +1064,7 @@
   function renderFrame(nowMs) {
     requestAnimationFrame(renderFrame);
     if (!gl) return;
-    const canvas = $("glCanvas"), dpr = window.devicePixelRatio || 1;
+    const canvas = $("glCanvas"), dpr = Math.min(window.devicePixelRatio || 1, 2.0);
     const w = Math.max(100, Math.floor(canvas.clientWidth*dpr)), h = Math.max(100, Math.floor(canvas.clientHeight*dpr));
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     gl.viewport(0,0,w,h); gl.clearColor(0.025,0.055,0.11,1.0);
@@ -1066,7 +1077,8 @@
     const ex = cam.tgt[0] + cam.dist*Math.cos(cam.pitch)*Math.sin(cam.yaw);
     const ey = cam.tgt[1] + cam.dist*Math.sin(cam.pitch);
     const ez = cam.tgt[2] + cam.dist*Math.cos(cam.pitch)*Math.cos(cam.yaw);
-    const VP = mat4Mul(mat4Perspective(0.75, w/h, 0.2, 4000.0), mat4LookAt([ex,ey,ez], cam.tgt, [0,1,0]));
+    const zNear = Math.max(0.8, Math.min(8.0, cam.dist * 0.055)), zFar = Math.max(380.0, cam.dist * 6.0);
+    const VP = mat4Mul(mat4Perspective(0.75, w/h, zNear, zFar), mat4LookAt([ex,ey,ez], cam.tgt, [0,1,0]));
     gl.uniform3f(loc.uLightDir, 0.45, 0.80, 0.39);
 
     const tSec = nowMs * 0.001, wm = scene3d.wave_motion, om = 2*Math.PI/Math.max(2.0, wm.tp_s);
@@ -1080,7 +1092,11 @@
     const hullM = mat4Mul(mat4Translate(surge, heave, 0), mat4RotateZ(-pitchR));
 
     drawMesh(gpuBuffers.opaqueHull, hullM, VP, 1.0);
-    if (cutawayOn && gpuBuffers.innerHull) drawMesh(gpuBuffers.innerHull, hullM, VP, 1.0);
+    if (cutawayOn && gpuBuffers.innerHull) {
+      gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2.0, 4.0);
+      drawMesh(gpuBuffers.innerHull, hullM, VP, 1.0);
+      gl.disable(gl.POLYGON_OFFSET_FILL);
+    }
     if (cutawayOn && gpuBuffers.cutBezel) drawMesh(gpuBuffers.cutBezel, hullM, VP, 1.0);
 
     const pto = scene3d.internal_pto_3d;
@@ -1123,7 +1139,7 @@
     buildDynamicMooringTubes(hullM, VP);
 
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-    drawWaveGrid(tSec, VP);
+    drawWaveGrid(tSec, VP, surge);
     if (cutawayOn && gpuBuffers.glassHull) drawMesh(gpuBuffers.glassHull, hullM, VP, 0.14);
     gl.depthMask(true); gl.disable(gl.BLEND);
   }
@@ -1308,6 +1324,22 @@
       { id:"mathieu_pitch", label:"Steep-Wave Parametric Pitch Stability", pass: baseRec.mathieu < 1.0, value_str:`Index ${baseRec.mathieu.toFixed(3)}`, limit_str:"< 1.000 (Stable)", severity:"warning",
         explanation:"Detects runaway 2:1 rocking instability caused when hull buoyancy shifts rapidly in steep waves.", hint:"Adjust tuned wave period away from half the pitch period." },
     ];
+    if (baseRec.pto_ver) {
+      const pv = baseRec.pto_ver;
+      const ptoTd = +(pv.p_td_kw * Math.pow(lam, 3.0)).toFixed(1);
+      const yawOk = (baseRec.arch !== "arch_c_gyro") || (nLines >= 3) || (pv.ngyro >= 2);
+      const ptoPass = !!pv.ok && yawOk && (ptoTd > 0.1);
+      checks.push({
+        id: "pto_hardware_feasibility",
+        label: "PTO Drivetrain & Electromechanical Verification",
+        pass: ptoPass,
+        value_str: `${ptoTd} kW RK4 | ${pv.rpm} RPM | +${pv.dt_c} C`,
+        limit_str: "Net>0 RK4, Fit, Load, Hs<=0.85m, Yaw, dT<=25C",
+        severity: ptoPass ? "info" : "critical",
+        explanation: `Nonlinear RK4 time-domain + copper I^2R + stiction check (${pv.drv}). Peak: ${pv.pk_load}, cut-in Hs ${pv.cut_in_m} m.${yawOk ? '' : ' Single gyro on 1-2 lines induces yaw twist.'}`,
+        hint: "Use 3+ mooring lines (or twin counter-rotating CMGs) to balance yaw torque.",
+      });
+    }
     if (overrides.max_draft_m) checks.push({ id:"harbor_draft", label:"Port & Site Max Draft Cap", pass: keelD <= overrides.max_draft_m + 0.01, value_str:`${keelD.toFixed(2)} m`, limit_str:`<= ${overrides.max_draft_m.toFixed(1)} m`, severity:"warning", explanation:"Confirms the fully ballasted buoy can clear shallow harbor and deployment site drafts.", hint:"Select a shallower hull or smaller diameter." });
     if (overrides.max_anchor_radius_m) checks.push({ id:"watch_circle", label:"Lease Seabed Footprint Limit", pass: rAnc <= overrides.max_anchor_radius_m + 0.5, value_str:`${rAnc.toFixed(1)} m radius`, limit_str:`<= ${overrides.max_anchor_radius_m.toFixed(1)} m`, severity:"warning", explanation:"Verifies all seabed anchors stay inside the permitted marine lease boundary.", hint:"Use taut polyester cables with Suction or Drilled piles to tighten the watch circle." });
 
@@ -1338,6 +1370,16 @@
       is_custom: !!overrides.is_custom,
       all_checks_pass: checks.every(c => c.pass),
       engineering_checks: checks,
+      pto_verification: baseRec.pto_ver ? {
+        overall_feasible: !!baseRec.pto_ver.ok,
+        p_elec_td_kw: +(baseRec.pto_ver.p_td_kw * Math.pow(lam, 3.0)).toFixed(1),
+        p_elec_spectral_kw: +(baseRec.pto_ver.p_sp_kw * Math.pow(lam, 3.0)).toFixed(1),
+        gen_rpm_rms: baseRec.pto_ver.rpm,
+        peak_load_str: baseRec.pto_ver.pk_load,
+        cut_in_hs_m: baseRec.pto_ver.cut_in_m,
+        hull_delta_t_c: baseRec.pto_ver.dt_c,
+        drivetrain_summary: baseRec.pto_ver.drv,
+      } : null,
       recommended: {
         hull: { shape_id: baseRec.hull_id, display_name: humanHull(baseRec.hull_id), family_label: hullMeta.family_label, circumdiameter_m: +dUse.toFixed(2), draft_m: draft, freeboard_m: fb, gm_m: gm, dry_mass_t: mass, m2_fraction: overrides.m2_fraction || baseRec.m2_fraction },
         internal_pto: { architecture: baseRec.arch, display_name: PTO_NAMES[baseRec.arch], short_name: PTO_SHORT[baseRec.arch], rated_power_kW: ratedKw, tuned_period_s: overrides.tp_tune || baseRec.tp_tune, shaft_inclination_deg: overrides.alpha_deg || baseRec.alpha_deg, flywheel_material: overrides.fw_mat || baseRec.fw_mat, flywheel_rpm: overrides.fw_rpm || baseRec.fw_rpm },
@@ -1537,7 +1579,8 @@
         <h4>Step 3 · Time-Domain Calibration &amp; Availability</h4>
         <p>Raw spectral power is multiplied by a multi-fidelity factor (<b>${rec.confidence.wecsim_calibration_mult || 1.0}x</b> learned from 54 coupled WEC-Sim + MoorDyn runs) plus weather-window availability (<b>${(ec.availability*100).toFixed(1)}%</b>) and 98% electrical array efficiency.</p>
         <h4>Live Result &amp; 80% Conformal Confidence Interval</h4>
-        <div class="formula-box">Expected P50 = ${ec.aep_array_mwh} MWh/yr (${ec.units || 1} unit${(ec.units||1)>1?'s':''}, CF ${perf.capacity_factor_pct}%)<br/>80% Confidence Band (P10–P90): ${ec.aep_array_p10_mwh} – ${ec.aep_array_p90_mwh} MWh/yr</div>`;
+        <div class="formula-box">Expected P50 = ${ec.aep_array_mwh} MWh/yr (${ec.units || 1} unit${(ec.units||1)>1?'s':''}, CF ${perf.capacity_factor_pct}%)<br/>80% Confidence Band (P10–P90): ${ec.aep_array_p10_mwh} – ${ec.aep_array_p90_mwh} MWh/yr</div>
+        ${ass.pto_verification ? `<h4>Verified PTO Drivetrain &amp; Time-Domain Check</h4><div class="formula-box">Drivetrain: ${ass.pto_verification.drivetrain_summary}<br/>Nonlinear RK4 Mean Net Output: ${ass.pto_verification.p_elec_td_kw} kW/unit (vs ${ass.pto_verification.p_elec_spectral_kw} kW spectral)<br/>Gen Speed: ${ass.pto_verification.gen_rpm_rms} RPM | Peak Load: ${ass.pto_verification.peak_load_str}<br/>Cut-in Hs: ${ass.pto_verification.cut_in_hs_m} m | Passive Hull Temp Rise: +${ass.pto_verification.hull_delta_t_c} C</div>` : ''}`;
     } else {
       $("calcModalTitle").textContent = "How Upfront Cost (CAPEX) & Energy Cost (LCOE) Are Calculated";
       $("calcModalBody").innerHTML = `
